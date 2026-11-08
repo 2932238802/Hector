@@ -59,9 +59,12 @@ doc/
 ├── reference/             # 参考资料区
 ├── 00-vision/
 │   ├── player-persona.md          # 玩家画像（review）
+│   ├── design-summary-2026-11-08.md  # 设计现状总览（draft）
 │   ├── concept-ant-colony.md      # 早期概念（deprecated）
 │   ├── game-concept-explainer.md  # 已否决方向（deprecated）
 │   └── brainstorm-2026-11-08.md   # 头脑风暴存档（deprecated）
+├── 01-loop/
+│   └── turn-flow.md               # 回合流程（draft）
 ├── 02-systems/
 │   ├── time-and-seasons.md        # 时间与季节
 │   ├── economy.md                 # 经济与资源
@@ -76,7 +79,6 @@ doc/
 │   ├── factions.md                # 势力与中立生物
 │   └── relics.md                  # 虫珀
 └── （待建）
-    ├── 01-loop/                   # 核心循环、局内结构、局外成长
     ├── 04-narrative/              # 世界观、角色、文案
     ├── 05-art/                    # 美术方向、色板、UI
     ├── 06-audio/                  # 音乐、音效
@@ -96,18 +98,20 @@ doc/
 | `COVERAGE.md` | living | 完备性覆盖清单 |
 | `reference/` | living | 参考资料 |
 | `00-vision/player-persona.md` | review | 玩家画像与设计含义 |
+| `00-vision/design-summary-2026-11-08.md` | draft | 设计现状总览：已定 / 待定 / 下一步 |
 | `00-vision/concept-ant-colony.md` | deprecated | 早期概念草案 |
 | `00-vision/game-concept-explainer.md` | deprecated | 阵线 / 织命（否决） |
 | `00-vision/brainstorm-2026-11-08.md` | deprecated | 六方向头脑风暴存档 |
-| `02-systems/time-and-seasons.md` | draft | 四季连玩、40 决策 |
-| `02-systems/economy.md` | draft | 食物 / 石头 / 纤维 |
-| `02-systems/events.md` | draft | 事件组 N 选 1 |
-| `02-systems/nest-honeycomb.md` | draft | 中心六边形 + 外圈 |
-| `02-systems/combat.md` | deferred | 战斗 v0.1 草案备查 |
+| `01-loop/turn-flow.md` | draft | 收入 + 蚁后产工蚁 + 工蚁恢复巢穴健康 + 三选一 + 事件组 |
+| `02-systems/time-and-seasons.md` | draft | 四季连玩、40 决策、季节特性、默认天气 |
+| `02-systems/economy.md` | draft | 食物 / 石头 / 纤维；生产单位；战斗损耗食物；季节修正；种子产出；战粮 |
+| `02-systems/events.md` | draft | 事件组 N 选 1；组内 A→D 四事件；季节特性；种子探索；招募事件 |
+| `02-systems/nest-honeycomb.md` | draft | 中心六边形 + 外圈；位置可阻断扩展；种子播种 |
+| `02-systems/combat.md` | draft | 前5后4 + 手动 AP + 蚁穴外战斗 + 准备就绪；战粮；季节/天气修正 |
 | `03-content/ant-types.md` | living | 蚁种/兵种总览 |
 | `03-content/species.md` | draft | 5 个蚁种候选 |
-| `03-content/units.md` | draft | 兵种与资源配方 |
-| `03-content/talent-trees.md` | draft | 3×3 天赋树 |
+| `03-content/units.md` | draft | 兵种 + 食物为主招募（事件触发）+ 战粮 |
+| `03-content/talent-trees.md` | draft | 天赋树（结构未定） |
 | `03-content/factions.md` | draft | 中立 / 弱小 / 强大 |
 | `03-content/relics.md` | draft | 虫珀 |
 
@@ -122,8 +126,13 @@ doc/
 - [x] 未决问题 / 覆盖清单骨架
 - [x] 核心概念：蚁群战争
 - [x] 时间结构：四季连玩（4 大回合 × 10 决策）
+- [x] 回合流程（初稿：收入 / 三选一 / 事件组）
 - [x] 经济、事件、巢穴、蚁种、兵种、天赋、势力、虫珀 初稿
-- [ ] 战斗（deferred）
+- [x] 战斗（初稿）
+- [x] 经济闭环：战斗损耗食物 + 工蚁恢复巢穴健康
+- [x] 季节特性与默认天气
+- [x] 种子系统（替代地势探索）；招募改为事件触发
+- [x] 战斗保持手动 AP；战粮（强化食物）
 - [ ] 人口 / 卵 / 幼虫成长
 - [ ] 巢穴外圈格子内容
 - [ ] 胜负条件与局外成长

@@ -25,6 +25,7 @@ last-review: 2026-11-08
 | 项 | 文档 | 状态 | 备注 |
 |---|---|---|---|
 | 玩家画像 / 核心快感 | `00-vision/player-persona.md` | review | 已有；待升级 approved |
+| 设计现状总览 | `00-vision/design-summary-2026-11-08.md` | draft | 一页汇总；随讨论更新 |
 | 一句话概念 / 类型 / 目标玩家 | `00-vision/game-concept.md` | — | 未建 |
 | 设计支柱（不可妥协原则） | `00-vision/design-pillars.md` | — | 未建 |
 | v1.0 范围与非目标 | `00-vision/scope-v1.md` | — | 未建 |
@@ -35,7 +36,8 @@ last-review: 2026-11-08
 | 项 | 文档 | 状态 | 备注 |
 |---|---|---|---|
 | 核心循环（局内 / 局外） | `01-loop/core-loop.md` | — | 未建 |
-| 一局的结构与时长 | `02-systems/time-and-seasons.md` | draft | 四季连玩、40 决策 |
+| 回合流程（收入 / 三选一 / 事件组） | `01-loop/turn-flow.md` | draft | 收入 / 生产周期 / 三选一 / 事件组 / 工蚁恢复巢穴健康 |
+| 一局的结构与时长 | `02-systems/time-and-seasons.md` | draft | 四季连玩、40 决策、季节特性、默认天气 |
 | 局内成长曲线 | `01-loop/in-run-progression.md` | — | 未建（天赋/兵种散落各文档） |
 | 局外解锁与难度阶梯 | `01-loop/meta-progression.md` | — | 未建 |
 
@@ -43,12 +45,12 @@ last-review: 2026-11-08
 
 | 项 | 文档 | 状态 | 备注 |
 |---|---|---|---|
-| 战斗规则 | `02-systems/combat.md` | deferred | v0.1 草案备查 |
-| 兵种与部署 | `03-content/units.md` | draft | 资源配方已加 |
-| 巢穴 / 空间 | `02-systems/nest-honeycomb.md` | draft | 中心 + 外圈；格子内容待定 |
-| 经济与资源 | `02-systems/economy.md` | draft | 食物 / 石头 / 纤维 |
-| 随机事件 | `02-systems/events.md` | draft | N 选 1；频率待定 |
-| 时间与季节 | `02-systems/time-and-seasons.md` | draft | 四季连玩 |
+| 战斗规则 | `02-systems/combat.md` | draft | 前5后4 + 手动 AP + 蚁穴外战斗 + 准备就绪；士兵失败返场；战斗损耗食物；战粮；季节/天气修正 |
+| 兵种与部署 | `03-content/units.md` | draft | 食物为主招募（事件触发）；士兵持久且不饿死；工蚁不能出战；战粮 |
+| 巢穴 / 空间 | `02-systems/nest-honeycomb.md` | draft | 中心 + 外圈；位置可阻断扩展；种子播种（替代地势） |
+| 经济与资源 | `02-systems/economy.md` | draft | 食物 / 石头 / 纤维；生产周期以事件计；战斗损耗食物；季节修正；种子产出；战粮 |
+| 随机事件 | `02-systems/events.md` | draft | N 选 1；组内 A→D 四事件；季节特性；种子探索；招募事件 |
+| 时间与季节 | `02-systems/time-and-seasons.md` | draft | 四季连玩；季节特性；默认天气 |
 | 难度与 Boss | `02-systems/difficulty-boss.md` | — | 未建 |
 
 ## D. 内容
@@ -58,8 +60,8 @@ last-review: 2026-11-08
 | 内容总量与清单 | `03-content/content-matrix.md` | — | 未建 |
 | 蚁种 | `03-content/species.md` | draft | 5 个候选 |
 | 兵种数值表 | `03-content/units.md` | draft | 共享 6 + 专属 |
-| 天赋树 | `03-content/talent-trees.md` | draft | 3×3；点数待重算 |
-| 势力 / 中立生物 | `03-content/factions.md` | draft | 中立 / 弱 / 强 |
+| 天赋树 | `03-content/talent-trees.md` | draft | 结构未定；点数已定 |
+| 势力 / 中立生物 | `03-content/factions.md` | draft | 中立 / 弱 / 强；敌对基本不可避免 |
 | 虫珀 | `03-content/relics.md` | draft | 遗物类物品 |
 | 敌人与 Boss 数值表 | `03-content/enemies.md` | — | 未建 |
 | 建筑 / 设施 / 道具 | `03-content/structures-items.md` | — | 未建 |
