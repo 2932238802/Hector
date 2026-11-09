@@ -136,6 +136,16 @@ func _test_event_options() -> void:
 	check(game.phase == GameStateScript.Phase.DEPLOY, "battle option enters DEPLOY")
 	check(str(game.pending_event.get("battle", "")) == "sand", "battle option carries tier")
 
+	var lethal = _boot(127)
+	lethal.health = 3.0
+	_force_single_event(lethal, {
+		"id": "test_lethal", "category": "random", "pressure": false,
+		"title": "致命选项", "text": "",
+		"options": [{"label": "硬闯", "effects": {"health": -5}}],
+	})
+	check(lethal.choose_event_option(0), "lethal option resolves")
+	check(lethal.phase == GameStateScript.Phase.GAME_OVER, "health 0 during an option ends the run")
+
 
 func _test_nest_expansion() -> void:
 	var game = _boot(7)
@@ -550,6 +560,7 @@ func _test_data_store() -> void:
 	check(store.version == applied, "version unchanged on invalid data")
 	check(int(store.get_data("balance").get("max_health", 0)) == 101, "old data kept on invalid JSON")
 	check(not store.last_error.is_empty(), "invalid data records an error")
+	check(not store.apply_text("balance", '{"schema_version":1}'), "missing required keys rejected")
 	check(store.apply_text("balance", good), "good text re-applies after a bad save")
 	check(store.apply_text("balance", good) == false, "same text is not re-applied")
 

@@ -18,6 +18,14 @@ const FILES := {
 
 const POLL_INTERVAL := 0.25
 const REQUIRED_SCHEMA := 1
+const REQUIRED_KEYS := {
+	"balance": ["max_health", "start"],
+	"events": ["events"],
+	"event_templates": ["templates"],
+	"units": ["units"],
+	"enemies": ["tiers"],
+	"seeds": ["seeds"],
+}
 
 static var _instance = null
 
@@ -100,6 +108,11 @@ func _apply(name: String, text: String) -> bool:
 		# 记下坏文本，避免每次轮询重复报错；旧数据保留。
 		_texts[name] = text
 		return false
+	for key in REQUIRED_KEYS.get(name, []):
+		if not parsed.has(key):
+			_set_error(name, "缺少必填字段「%s」" % key)
+			_texts[name] = text
+			return false
 	data[name] = parsed
 	_texts[name] = text
 	version += 1

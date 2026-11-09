@@ -317,6 +317,11 @@ func choose_event_option(index: int) -> bool:
 		observed_forecast = true
 		_add_log("观察天气：下回合预计「%s」。" % forecast_weather(1))
 
+	if health <= 0.0:
+		_fail_game()
+		changed.emit()
+		return true
+
 	var letter: String = EVENT_LETTERS[event_index] if event_index < EVENT_LETTERS.size() else "?"
 	_add_log("事件 %s：%s → %s。" % [letter, str(event.get("title", "")), label])
 

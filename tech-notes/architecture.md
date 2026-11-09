@@ -161,8 +161,8 @@ ACTION（三选一 + 播种）
   保存后 1 秒内发现。
 - **生效**：`data_reloaded` → `GameState.reload_data()` → 刷新 UI；单位 / 敌人 / 补给的快照在
   `start_battle()` 时建立，战斗中不读新数据；奖励表也存进 `battle["rewards"]`。
-- **失败**：JSON 解析失败或 `schema_version != 1` 时保留上一份有效数据，`last_error` 记录，
-  UI 顶部显示红色警告；重复轮询不会反复刷错。
+- **失败**：JSON 解析失败、`schema_version != 1` 或缺必填顶层键（如 `balance.max_health` / `units.units`）
+  时保留上一份有效数据，`last_error` 记录，UI 顶部显示红色警告；重复轮询不会反复刷错。
 - **版本**：`DataStore.version` 每次成功应用 +1，`GameState.data_version` 记录已应用版本。
 
 ## 5. 测试
