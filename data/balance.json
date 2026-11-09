@@ -1,15 +1,20 @@
 {
   "max_health": 100,
   "start": {
-    "health": 60,
+    "health": 100,
     "food": 15,
     "workers": 4,
     "nest_level": 2,
     "seed": "grain_basic",
-    "army": ["ruishi", "chihou", "caiwei"]
+    "army": [],
+    "free_recruits": 2
   },
   "queen": {
     "workers_per_turn": 2
+  },
+  "upkeep": {
+    "base": 1,
+    "per_pop": 5
   },
   "heal": {
     "per_worker": 0.6,
@@ -52,7 +57,18 @@
     }
   },
   "combat": {
-    "defeat_health": 10
+    "defeat_health": 10,
+    "rewards": {
+      "sand": { "food": [2, 4], "warfruits": 0.5, "amber": 0.0 },
+      "resin": { "food": [2, 4], "warfruits": 0.5, "amber": 0.0 },
+      "nest": { "food": [2, 4], "warfruits": 0.5, "amber": 0.0 },
+      "bird": { "food": [4, 6], "warfruits": 1.0, "amber": 0.5 }
+    }
+  },
+  "spring": {
+    "seed_food_bonus": 1,
+    "enemy_mult": 1.1,
+    "explore_worker_extra": 1
   },
   "weather": {
     "names": { "clear": "晴", "rain": "雨", "cloudy": "多云" },

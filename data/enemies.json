@@ -1,17 +1,28 @@
 {
   "tiers": {
-    "weak": {
-      "name": "弱小敌对势力",
+    "sand": {
+      "name": "沙路截击",
       "units": [
-        { "name": "敌兵蚁", "hp": 10.0, "atk": 2.0, "ap": 2, "row": "front", "count": 2 }
+        { "name": "盾甲", "hp": 8.0, "atk": 1.5, "ap": 1, "row": "front", "count": 2, "shield_per_round": 2.0 }
       ]
     },
-    "strong": {
-      "name": "强大敌对势力",
+    "resin": {
+      "name": "树脂争夺",
       "units": [
-        { "name": "敌兵蚁", "hp": 12.0, "atk": 3.0, "ap": 2, "row": "front", "count": 2 },
-        { "name": "敌卫兵", "hp": 18.0, "atk": 2.0, "ap": 2, "row": "front", "count": 1 },
-        { "name": "敌喷酸虫", "hp": 8.0, "atk": 3.0, "ap": 1, "row": "back", "count": 1 }
+        { "name": "锹甲", "hp": 6.0, "atk": 2.5, "ap": 1, "row": "front", "count": 2, "weaken_chance": 0.3 }
+      ]
+    },
+    "nest": {
+      "name": "巢口巡游",
+      "units": [
+        { "name": "结网蛛", "hp": 4.0, "atk": 2.0, "ap": 1, "row": "back", "count": 2, "weaken_per_round": 1 }
+      ]
+    },
+    "bird": {
+      "name": "雀袭（强敌）",
+      "units": [
+        { "name": "掠食雀", "hp": 9.0, "atk": 3.0, "ap": 1, "row": "back", "count": 1, "bypass_first": true },
+        { "name": "盾甲", "hp": 8.0, "atk": 1.5, "ap": 1, "row": "front", "count": 1, "shield_per_round": 2.0 }
       ]
     }
   }

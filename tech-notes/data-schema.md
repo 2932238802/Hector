@@ -4,7 +4,7 @@ owner: tech
 last-review: 2026-11-09
 ---
 
-# 数据 Schema（M2）
+# 数据 Schema（M6 春季切片）
 
 > 所有数值都是**原型占位**，不做平衡承诺。JSON 放在 `data/`，游戏只读不写。
 > 文档 `doc/02-systems/economy.md` / `time-and-seasons.md` 是规则的唯一来源。
@@ -14,13 +14,18 @@ last-review: 2026-11-09
 | 键 | 类型 | 含义 |
 |---|---|---|
 | `max_health` | int | 巢穴完整度上限 |
-| `start.health` | int | 开局完整度 |
+| `start.health` | int | 开局完整度（切片 100） |
 | `start.food` | int | 开局食物（唯一资源） |
 | `start.workers` | int | 开局工蚁数 |
 | `start.nest_level` | int | 开局巢穴等级（当前 2） |
 | `start.seed` | string | 开局已种下的种子 id（`seeds.json`） |
-| `start.army` | string[] | 开局军队（`units.json` 的 id） |
+| `start.army` | string[] | 开局军队（切片为空，改为免费招募） |
+| `start.free_recruits` | int | 开局免费招募次数（当前 2，3 选 1） |
 | `queen.workers_per_turn` | int | 蚁后每回合产工蚁 |
+| `upkeep.base` / `per_pop` | int | 每回合维持 = `base + ceil(人口 / per_pop)` |
+| `spring.seed_food_bonus` | int | 春季食物型种子每次额外产出 |
+| `spring.enemy_mult` | float | 春季敌人 HP / 攻击倍率 |
+| `spring.explore_worker_extra` | int | 春季探索工蚁额外损失（尚未接入） |
 | `heal.per_worker` | float | 每只工蚁每回合的被动恢复量 |
 | `heal.cap` | float | 每回合被动恢复上限 |
 | `actions.adventure.food_min` / `food_max` | int | 冒险食物收益区间 |
@@ -39,6 +44,7 @@ last-review: 2026-11-09
 | `recruit.candidates` | int | 每次招募生成几个候选（当前 3） |
 | `recruit.tier_rates` | object | 按巢穴等级（`"2"` / `"3"` / `"4"`）的各阶权重，如 `[[1,60],[2,40]]` |
 | `combat.defeat_health` | int | 战斗失败扣的巢穴完整度 |
+| `combat.rewards.<tier>` | object | 战斗胜利奖励：`food` 区间 / `warfruits` 概率 / `amber` 概率；tier 为 `sand` / `resin` / `nest` / `bird` |
 | `weather.names` | object | 天气 id → 显示名（`clear` 晴 / `rain` 雨 / `cloudy` 多云） |
 | `weather.weights` | object[] | 按季节索引的天气权重（4 项，对应春 / 夏 / 秋 / 冬） |
 | `weather.effects.<id>.*` | object | 天气效果：`adventure_food` / `adventure_workers` / `adventure_health` / `supply_mult` |
@@ -138,9 +144,23 @@ last-review: 2026-11-09
 | `food` | int | 食物增减，结算后不低于 0 |
 | `workers` | int | 工蚁增减，结算后不低于 0 |
 | `seed` | bool / string | `true` 从冒险池随机 1 颗；字符串按 id 给种子 |
+| `warspoil` | int | 战果 +N（通用 `warspoil` 计数） |
+| `amber` | int | 虫珀 +N |
 
-> 带 `battle` 的事件，`effects` 只在**战斗胜利**时结算，视为战利品；
-> 失败时改为扣 `combat.defeat_health`。
+`options[]`（春季事件用；存在时玩家必须选一个）：
+
+| 键 | 类型 | 说明 |
+|---|---|---|
+| `label` | string | 按钮文字 |
+| `food_cost` | int | 选择前扣食物，不足则不可选 |
+| `effects` | object | 同上的结算键 |
+| `roll` | object | `chance` / `effects` / `fail_chance` / `fail_effects` 概率分支 |
+| `battle` | string | 选择后进入布阵，值为 `enemies.json` 的 tier |
+| `recruit` | bool | 结算后进入招募 |
+| `observe` | bool | 记录预报提示 |
+
+> 有 `options` 的事件用 `choose_event_option(index)`；没有 `options` 的旧式事件仍走
+> `ready_up()` 或 `choose_encounter(...)`。
 
 ## 4. `data/units.json`
 
@@ -164,10 +184,10 @@ last-review: 2026-11-09
 ```json
 {
   "tiers": {
-    "weak": {
-      "name": "弱小敌对势力",
+    "sand": {
+      "name": "沙路截击",
       "units": [
-        { "name": "敌兵蚁", "hp": 10, "atk": 2, "ap": 2, "row": "front", "count": 2 }
+        { "name": "盾甲", "hp": 8.0, "atk": 1.5, "ap": 1, "row": "front", "count": 2, "shield_per_round": 2.0 }
       ]
     }
   }
@@ -176,8 +196,13 @@ last-review: 2026-11-09
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `tiers.<tier>.name` | string | 势力显示名 |
+| `tiers.<tier>.name` | string | 势力显示名（`sand` / `resin` / `nest` / `bird`） |
 | `tiers.<tier>.units[]` | array | 敌军模板列表 |
+| `count` | int | 该模板生成几个 |
+| `shield_per_round` | float | 每轮开始护盾补到该值（盾甲） |
+| `weaken_chance` | float | 命中后施加 1 层削弱的概率（锹甲） |
+| `weaken_per_round` | int | 每轮开始对随机玩家单位施加削弱层数（结网蛛） |
+| `bypass_first` | bool | 每轮首次攻击无视前排（掠食雀） |
 | `units[].name` | string | 敌军单位名 |
 | `units[].hp` / `atk` / `ap` | number | 属性；防御已删除 |
 | `units[].row` | string | `front` / `back`；双方前 4 后 3，超出容量的模板忽略 |
@@ -208,28 +233,30 @@ unit = { "name", "hp", "max_hp", "atk", "ap", "max_ap", "shield", "row", "alive"
 2. 每组至少 1 个敌对势力（`enemy_weak` / `enemy_strong`）。
 3. 每轮 3 组，模板互不重复；最多 1 个危机组、1 个含遗迹模板。
 4. 季节过滤：`season == -1` 或等于当前季节；同一轮内尽量不重复事件 id。
-5. 敌对事件不自动开战，必须经 `choose_encounter`（迎战 / 谈判 / 回避）。
+5. 有 `options` 的事件必须经 `choose_event_option`；旧式敌对事件经 `choose_encounter`。
 
 时间 / 经济（`GameState`）：
 
-5. 一局 24 回合；`turn_in_season()` 在 1–6 之间；第 24 回合结束 → `WON`。
-6. 资源只有 `food`；任何扣减不低于 0。
-7. 巢穴完整度夹在 `[0, max_health]`；归零 → `GAME_OVER`。
-8. 肥沃格每圈 3 个；`blocked` 格不可播种。
-9. 一颗种子只能种在「肥沃 + 未阻断 + 未占用」的格子；种子袋数量与已种数量之和守恒。
-10. 种子计数只在事件结算后推进一次（含战斗事件，战后结算一次）。
+6. 一局 6 回合（春季切片）；第 6 回合结束 → `WON`，并输出本季统计。
+7. 开局先免费招募 2 次（3 选 1、免费、不占行动），完成后才进入 ACTION。
+8. 每回合维持 `1 + ceil((工蚁 + 军队) / 5)`，食物不足只扣到 0。
+9. 资源只有 `food`；任何扣减不低于 0。
+10. 巢穴完整度夹在 `[0, max_health]`；归零 → `GAME_OVER`。
+11. 肥沃格每圈 3 个；`blocked` 格不可播种。
+12. 一颗种子只能种在「肥沃 + 未阻断 + 未占用」的格子；种子袋数量与已种数量之和守恒。
+13. 种子计数只在事件结算后推进一次（含战斗事件，战后结算一次）。
 
 战斗 / 招募：
 
-11. 军队数量 ≤ `army.max_size`；招募不会超上限。
-12. 候选阶级 ≤ 当前巢穴阶级（L2 = 1、L3 ≤ 2、L4 ≤ 3），成本 ≤ 当前食物；不满足的单位不进池。
-13. 升阶后第一次招募至少 1 个新阶级（且付得起）；保底在该次生成后清 0，刷新不重复触发。
-14. 每场战斗只扣一次补给，且只按 `deployed=true` 的单位累计；战斗结束后军队数量不变（士兵返场）。
-15. 战斗失败只扣一次 `defeat_health`，不会把完整度扣成负数。
-16. 招募刷新每轮最多一次。
-17. 目标合法性：某排有存活单位时，另一排不可被选为目标（双方通用）。
-18. 第 6 轮敌方阶段结束仍未分胜负 → `result = "ruling"`，按防守方胜结算且掉落减半。
-19. 单位 HP 不跨场：每场从 `units.json` / `enemies.json` 重建，满血开场。
+14. 军队数量 ≤ `army.max_size`；招募不会超上限。
+15. 候选阶级 ≤ 当前巢穴阶级（L2 = 1、L3 ≤ 2、L4 ≤ 3），成本 ≤ 当前食物；不满足的单位不进池。
+16. 升阶后第一次招募至少 1 个新阶级（且付得起）；保底在该次生成后清 0，刷新不重复触发。
+17. 每场战斗只扣一次补给，且只按 `deployed=true` 的单位累计；战斗结束后军队数量不变（士兵返场）。
+18. 战斗失败只扣一次 `defeat_health`，不会把完整度扣成负数。
+19. 招募刷新每轮最多一次。
+20. 目标合法性：某排有存活单位时，另一排不可被选为目标（双方通用）。
+21. 第 6 轮敌方阶段结束仍未分胜负 → `result = "ruling"`，按防守方胜结算且食物奖励减半。
+22. 单位 HP 不跨场：每场从 `units.json` / `enemies.json` 重建，满血开场。
 
 ## 7. 校验与演进
 

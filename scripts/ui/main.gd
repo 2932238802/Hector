@@ -45,19 +45,21 @@ func _maybe_demo() -> void:
 	var show_event := "--demo-event" in args
 	var demo_event := {
 		"id": "demo_battle" if not is_recruit else "demo_recruit",
-		"category": "self" if is_recruit else "enemy",
+		"category": "self" if is_recruit else "enemy_strong",
 		"pressure": not is_recruit,
 		"title": "育婴室" if is_recruit else "演示战",
 		"text": "开发用演示。",
-		"effects": {"food": 5} if not is_recruit else {},
+		"effects": {} if is_recruit else {},
 	}
 	if is_recruit:
 		demo_event["recruit"] = true
 	else:
-		demo_event["battle"] = "strong"
+		demo_event["battle"] = "bird"
+	if not is_recruit and game.army.is_empty():
+		game.army.assign(["ruishi", "chihou", "caiwei"])
 	game.active_group = {
 		"events": [demo_event],
-		"categories": ["self" if is_recruit else "enemy"],
+		"categories": ["self" if is_recruit else "enemy_strong"],
 		"pressure": 0 if is_recruit else 1,
 	}
 	game.event_index = 0
@@ -314,7 +316,7 @@ func _phase_text() -> String:
 		GameStateScript.Phase.GAME_OVER:
 			return "本局失败"
 		GameStateScript.Phase.WON:
-			return "终局"
+			return "春季结束"
 	return ""
 
 
@@ -437,6 +439,21 @@ func _build_event() -> void:
 	body.custom_minimum_size = Vector2(0, 72)
 	side_box.add_child(body)
 
+	var options: Array = event.get("options", [])
+	if not options.is_empty():
+		side_box.add_child(_hint("进度 %d/4 · 选择一个结果（选项代价为春季切片值）" % (game.event_index + 1)))
+		for i in options.size():
+			var opt: Dictionary = options[i]
+			var opt_button := Button.new()
+			opt_button.text = str(opt.get("label", "选项"))
+			opt_button.custom_minimum_size = Vector2(0, 46)
+			opt_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			if opt.has("food_cost"):
+				opt_button.disabled = int(game.resources["food"]) < int(opt["food_cost"])
+			opt_button.pressed.connect(_on_event_option.bind(i))
+			side_box.add_child(opt_button)
+		return
+
 	var is_battle: bool = event.has("battle")
 	side_box.add_child(_hint(("战利品：" if is_battle else "影响：") + _effects_text(event.get("effects", {}))))
 	if is_battle:
@@ -524,9 +541,9 @@ func _build_deploy() -> void:
 
 func _build_end() -> void:
 	var won: bool = game.phase == GameStateScript.Phase.WON
-	side_box.add_child(_title("终局" if won else "巢穴失守"))
+	side_box.add_child(_title("春季结束" if won else "巢穴失守"))
 	side_box.add_child(_hint(
-		"撑过了四季。" if won else "第 %d 回合，巢穴完整度归零。" % game.turn
+		game.season_summary() if won else "第 %d 回合，巢穴完整度归零。" % game.turn
 	))
 	side_box.add_child(_hint("巢穴 Lv.%d · 工蚁 %d · 种子 %d 粒（已种 %d）" % [
 		game.nest_level, game.workers, game.seeds.size(), game.planted.size()
@@ -593,10 +610,16 @@ func _build_battle() -> void:
 
 
 func _build_recruit() -> void:
-	side_box.add_child(_title("招募（3 选 1）"))
-	side_box.add_child(_hint("军队 %d/%d · 候选按巢穴阶级抽取；可刷新一次。" % [
-		game.army.size(), int(game.balance["army"]["max_size"])
-	]))
+	if game.recruit_free:
+		side_box.add_child(_title("开局免费招募（3 选 1）"))
+		side_box.add_child(_hint("免费、不占行动；剩余 %d 次。军队 %d/%d。" % [
+			game.free_recruits_left, game.army.size(), int(game.balance["army"]["max_size"])
+		]))
+	else:
+		side_box.add_child(_title("招募（3 选 1）"))
+		side_box.add_child(_hint("军队 %d/%d · 候选按巢穴阶级抽取；可刷新一次。" % [
+			game.army.size(), int(game.balance["army"]["max_size"])
+		]))
 	if game.recruit_pity_tier > 1:
 		side_box.add_child(_hint("升阶保底：本次必出%s单位。" % game.tier_name(game.recruit_pity_tier)))
 
@@ -605,7 +628,7 @@ func _build_recruit() -> void:
 		var button := Button.new()
 		button.text = "%s%s — %s" % [
 			game.tier_name(int(data.get("tier", 1))), str(data.get("name", unit_id)),
-			_cost_text(data.get("cost", {}))
+			"免费" if game.recruit_free else _cost_text(data.get("cost", {}))
 		]
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.custom_minimum_size = Vector2(0, 44)
@@ -617,16 +640,17 @@ func _build_recruit() -> void:
 			int(data.get("supply", 0)), str(data.get("signature", ""))
 		]))
 
-	var refresh_cost := int(game.balance["recruit"]["refresh_cost"])
-	var refresh_button := Button.new()
-	refresh_button.text = "刷新候选（%d 食物）" % refresh_cost
-	refresh_button.custom_minimum_size = Vector2(0, 42)
-	refresh_button.disabled = game.recruit_refreshed or int(game.resources["food"]) < refresh_cost
-	refresh_button.pressed.connect(_on_refresh)
-	side_box.add_child(refresh_button)
+	if not game.recruit_free:
+		var refresh_cost := int(game.balance["recruit"]["refresh_cost"])
+		var refresh_button := Button.new()
+		refresh_button.text = "刷新候选（%d 食物）" % refresh_cost
+		refresh_button.custom_minimum_size = Vector2(0, 42)
+		refresh_button.disabled = game.recruit_refreshed or int(game.resources["food"]) < refresh_cost
+		refresh_button.pressed.connect(_on_refresh)
+		side_box.add_child(refresh_button)
 
 	var skip_button := Button.new()
-	skip_button.text = "跳过"
+	skip_button.text = "跳过（不占行动）" if game.recruit_free else "跳过"
 	skip_button.custom_minimum_size = Vector2(0, 42)
 	skip_button.pressed.connect(_on_skip)
 	side_box.add_child(skip_button)
@@ -722,6 +746,10 @@ func _on_avoid() -> void:
 
 func _on_encounter(option: String) -> void:
 	game.choose_encounter(option)
+
+
+func _on_event_option(index: int) -> void:
+	game.choose_event_option(index)
 
 
 func _on_plant(seed_id: String) -> void:

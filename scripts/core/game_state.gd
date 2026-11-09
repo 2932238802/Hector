@@ -10,7 +10,7 @@ enum Phase { ACTION, GROUP_SELECT, EVENT, DEPLOY, BATTLE, RECRUIT, GAME_OVER, WO
 const EventPoolScript := preload("res://scripts/core/event_pool.gd")
 const HexGridScript := preload("res://scripts/core/hex_grid.gd")
 
-const TOTAL_TURNS := 24
+const TOTAL_TURNS := 6
 const TURNS_PER_SEASON := 6
 const GROUP_SIZE := 4
 const SEASONS := ["春", "夏", "秋", "冬"]
@@ -32,7 +32,7 @@ var season_weathers: Array[String] = []
 var weather_index := 0
 var event_index := 0
 var phase: int = Phase.ACTION
-var health := 60.0
+var health := 100.0
 var resources := {"food": 0}
 var workers := 0
 var exp_points := 0
@@ -52,6 +52,15 @@ var pending_event: Dictionary = {}
 var recruit_candidates: Array[String] = []
 var recruit_refreshed := false
 var recruit_pity_tier := 0
+var free_recruits_left := 0
+var recruit_free := false
+var amber := 0
+var run_start_food := 0
+var run_start_health := 100.0
+var battle_count := 0
+var win_count := 0
+var lose_count := 0
+var observed_forecast := false
 var logs: Array[String] = []
 
 
@@ -83,14 +92,19 @@ func start_new_game(p_seed: int = 0) -> void:
 	planted = []
 	warfruits = {}
 	army = []
-	for unit_id in balance["start"].get("army", []):
-		army.append(str(unit_id))
 	groups = []
 	active_group = {}
 	battle = {}
 	recruit_candidates = []
 	recruit_refreshed = false
 	recruit_pity_tier = 0
+	free_recruits_left = 0
+	recruit_free = false
+	amber = 0
+	battle_count = 0
+	win_count = 0
+	lose_count = 0
+	observed_forecast = false
 	logs = []
 
 	location = str(balance.get("location", "river"))
@@ -102,11 +116,14 @@ func start_new_game(p_seed: int = 0) -> void:
 	var start_seed := str(balance["start"].get("seed", ""))
 	if start_seed != "":
 		_plant(start_seed)
-	_add_log("新的一局：%s，巢穴 Lv.%d（%d 格，%d 个肥沃格），食物 %d，军队 %d 只。" % [
+	run_start_food = int(resources["food"])
+	run_start_health = health
+	_add_log("新的一局：%s，巢穴 Lv.%d（%d 格，%d 个肥沃格），食物 %d，完整度 %d。" % [
 		str(balance["locations"][location].get("name", location)), nest_level,
-		cells.size(), _usable_fertile_count(), int(resources["food"]), army.size()
+		cells.size(), _usable_fertile_count(), int(resources["food"]), int(health)
 	])
 	_begin_turn()
+	_begin_opening()
 
 
 func _begin_turn() -> void:
@@ -115,6 +132,11 @@ func _begin_turn() -> void:
 		_generate_season_weathers()
 	weather = season_weathers[weather_index]
 	weather_index += 1
+
+	var pop := workers + army.size()
+	var upkeep := int(balance["upkeep"]["base"]) + int(ceili(float(pop) / float(balance["upkeep"]["per_pop"])))
+	var paid := mini(upkeep, int(resources["food"]))
+	resources["food"] = int(resources["food"]) - paid
 	workers += int(balance["queen"]["workers_per_turn"])
 
 	var heal_amount := minf(
@@ -133,11 +155,42 @@ func _begin_turn() -> void:
 	pending_event = {}
 	recruit_candidates = []
 	phase = Phase.ACTION
-	_add_log("第 %d 回合（%s 第 %d/%d 回合，总 %d/%d）· 天气 %s：本回合预计产出 %d 食物，工蚁 +%d，巢穴恢复 +%d。" % [
+	_add_log("第 %d 回合（%s 第 %d/%d 回合，总 %d/%d）· 天气 %s：维持 -%d 食物，工蚁 +%d，巢穴恢复 +%d。" % [
 		turn, season_name(), turn_in_season(), TURNS_PER_SEASON, turn, TOTAL_TURNS,
-		weather_name(), _forecast_food_per_turn(),
+		weather_name(), paid,
 		int(balance["queen"]["workers_per_turn"]), int(heal_amount)
 	])
+	changed.emit()
+
+
+func _begin_opening() -> void:
+	free_recruits_left = int(balance["start"].get("free_recruits", 2))
+	if free_recruits_left <= 0:
+		phase = Phase.ACTION
+		return
+	_add_log("开局：免费招募 %d 次（3 选 1，不占行动）。" % free_recruits_left)
+	_open_free_recruit()
+
+
+func _open_free_recruit() -> void:
+	recruit_free = true
+	recruit_refreshed = true
+	recruit_candidates = _roll_recruits()
+	phase = Phase.RECRUIT
+	var done := int(balance["start"].get("free_recruits", 2)) - free_recruits_left
+	_add_log("免费招募 %d/%d：从一阶池 3 选 1，可跳过。" % [done + 1, int(balance["start"].get("free_recruits", 2))])
+	changed.emit()
+
+
+func _finish_free_recruit() -> void:
+	free_recruits_left -= 1
+	recruit_candidates = []
+	if free_recruits_left > 0:
+		_open_free_recruit()
+		return
+	recruit_free = false
+	phase = Phase.ACTION
+	_add_log("开局招募完成，第 1 回合开始。")
 	changed.emit()
 
 
@@ -228,6 +281,55 @@ func choose_encounter(option: String) -> bool:
 			changed.emit()
 			return true
 	return false
+
+
+func choose_event_option(index: int) -> bool:
+	if phase != Phase.EVENT:
+		return false
+	var event := current_event()
+	var options: Array = event.get("options", [])
+	if index < 0 or index >= options.size():
+		return false
+	var option: Dictionary = options[index]
+	var label := str(option.get("label", "选项"))
+	var cost := int(option.get("food_cost", 0))
+	if int(resources["food"]) < cost:
+		_add_log("食物不足 %d，无法选择「%s」。" % [cost, label])
+		changed.emit()
+		return false
+	if cost > 0:
+		resources["food"] = int(resources["food"]) - cost
+
+	_apply_effects(option.get("effects", {}))
+	var roll: Dictionary = option.get("roll", {})
+	if not roll.is_empty():
+		if rng.randf() < float(roll.get("chance", 0.0)):
+			_apply_effects(roll.get("effects", {}))
+		elif rng.randf() < float(roll.get("fail_chance", 0.0)):
+			_apply_effects(roll.get("fail_effects", {}))
+	if bool(option.get("observe", false)):
+		observed_forecast = true
+		_add_log("观察天气：下回合预计「%s」。" % forecast_weather(1))
+
+	var letter: String = EVENT_LETTERS[event_index] if event_index < EVENT_LETTERS.size() else "?"
+	_add_log("事件 %s：%s → %s。" % [letter, str(event.get("title", "")), label])
+
+	if option.has("battle"):
+		var battle_event := event.duplicate(true)
+		battle_event["battle"] = str(option["battle"])
+		_open_deploy(battle_event)
+		changed.emit()
+		return true
+
+	_tick_planted()
+	if bool(option.get("recruit", false)):
+		_open_recruit()
+		changed.emit()
+		return true
+
+	_advance_event()
+	changed.emit()
+	return true
 
 
 # ---------------------------------------------------------------------------
@@ -370,10 +472,11 @@ func start_battle() -> bool:
 	var enemies_back: Array = []
 	for template in _tier_units(str(pending_event.get("battle", "weak"))):
 		for i in int(template.get("count", 1)):
+			var enemy_mult := float(balance.get("spring", {}).get("enemy_mult", 1.0))
 			var unit := _make_unit(
 				str(template.get("name", "敌人")),
-				float(template.get("hp", 8)),
-				float(template.get("atk", 2)),
+				snappedf(float(template.get("hp", 8)) * enemy_mult, 0.1),
+				snappedf(float(template.get("atk", 2)) * enemy_mult, 0.1),
 				int(template.get("ap", 1)),
 				str(template.get("row", "front"))
 			)
@@ -382,6 +485,10 @@ func start_battle() -> bool:
 			elif enemies_back.size() < _row_cap("back"):
 				unit["row"] = "back"
 				enemies_back.append(unit)
+			for key in ["shield_per_round", "weaken_chance", "weaken_per_round", "bypass_first"]:
+				if template.has(key):
+					unit[key] = template[key]
+			unit["first_attack_used"] = false
 
 	battle = {
 		"player": {"front": players_front, "back": players_back},
@@ -391,6 +498,8 @@ func start_battle() -> bool:
 		"event": pending_event,
 		"result": "",
 	}
+	battle_count += 1
+	_start_round_effects()
 	phase = Phase.BATTLE
 	_add_log("战斗开始：我方 %d 只，敌方 %d 只，补给 -%d 食物。" % [
 		players_front.size() + players_back.size(),
@@ -419,6 +528,7 @@ func _make_unit(name: String, hp: float, atk: float, ap: int, row: String) -> Di
 		"ap": ap,
 		"max_ap": ap,
 		"shield": 0.0,
+		"weaken": 0,
 		"row": row,
 		"alive": true,
 	}
@@ -470,7 +580,13 @@ func end_player_phase() -> void:
 	for row in ["front", "back"]:
 		for enemy in battle["enemies"][row]:
 			while bool(enemy["alive"]) and int(enemy["ap"]) > 0:
-				var target := _pick_player_target()
+				var target := {}
+				if bool(enemy.get("bypass_first", false)) and not bool(enemy.get("first_attack_used", false)):
+					target = _pick_back_player()
+					if not target.is_empty():
+						enemy["first_attack_used"] = true
+				if target.is_empty():
+					target = _pick_player_target()
 				if target.is_empty():
 					break
 				_attack(enemy, target)
@@ -488,12 +604,35 @@ func end_player_phase() -> void:
 		return
 
 	_refill_ap()
+	_start_round_effects()
 	changed.emit()
+
+
+func _start_round_effects() -> void:
+	# 削弱每轮结束 -1 层；盾甲补盾；结网蛛吐丝；掠食雀重置越排攻击。
+	for row in ["front", "back"]:
+		for unit in battle["player"][row]:
+			unit["weaken"] = maxi(0, int(unit.get("weaken", 0)) - 1)
+		for enemy in battle["enemies"][row]:
+			enemy["weaken"] = maxi(0, int(enemy.get("weaken", 0)) - 1)
+			enemy["first_attack_used"] = false
+			if enemy.has("shield_per_round") and bool(enemy["alive"]):
+				enemy["shield"] = maxf(float(enemy.get("shield", 0.0)), float(enemy["shield_per_round"]))
+			if int(enemy.get("weaken_per_round", 0)) > 0 and bool(enemy["alive"]):
+				var target := _pick_player_target()
+				if not target.is_empty():
+					target["weaken"] = int(target.get("weaken", 0)) + int(enemy["weaken_per_round"])
+					_add_log("%s 吐丝，%s 被削弱（%d 层）。" % [
+						str(enemy["name"]), str(target["name"]), int(target["weaken"])
+					])
 
 
 func _attack(attacker: Dictionary, target: Dictionary) -> float:
 	var variance := rng.randf_range(0.90, 1.10)
-	var damage := maxf(0.1, snappedf(float(attacker["atk"]) * variance, 0.1))
+	var atk := float(attacker["atk"])
+	if int(attacker.get("weaken", 0)) > 0:
+		atk *= 0.5
+	var damage := maxf(0.1, snappedf(atk * variance, 0.1))
 	var shield := float(target.get("shield", 0.0))
 	if shield > 0.0:
 		var absorbed := minf(shield, damage)
@@ -510,6 +649,11 @@ func _attack(attacker: Dictionary, target: Dictionary) -> float:
 		if float(target["hp"]) <= 0.0 and bool(target["alive"]):
 			target["alive"] = false
 			_add_log("%s 退场。" % str(target["name"]))
+		if attacker.has("weaken_chance") and rng.randf() < float(attacker["weaken_chance"]):
+			target["weaken"] = int(target.get("weaken", 0)) + 1
+			_add_log("%s 的挑击使 %s 被削弱（%d 层）。" % [
+				str(attacker["name"]), str(target["name"]), int(target["weaken"])
+			])
 	else:
 		_add_log("%s 攻击 %s，被护盾完全挡下。" % [str(attacker["name"]), str(target["name"])])
 	return damage
@@ -530,6 +674,14 @@ func _side_alive(units: Array) -> bool:
 		if bool(unit["alive"]):
 			return true
 	return false
+
+
+func _pick_back_player() -> Dictionary:
+	var back: Array = battle["player"]["back"]
+	for unit in back:
+		if bool(unit["alive"]):
+			return unit
+	return {}
 
 
 func enemies_front_alive() -> bool:
@@ -584,17 +736,13 @@ func _finish_battle(victory: bool, ruling: bool = false) -> void:
 	battle["result"] = "ruling" if ruling else ("win" if victory else "lose")
 
 	if victory:
-		var effects: Dictionary = event.get("effects", {})
+		win_count += 1
 		if ruling:
-			var reduced := {}
-			for key in effects.keys():
-				if str(key) == "food":
-					reduced[key] = int(floor(float(int(effects[key])) / 2.0))
-			effects = reduced
-			_add_log("最终裁决：按未击杀结算，只给减少后的防守奖励。")
-		_apply_effects(effects)
-		_add_log("战斗胜利，战利品已结算。")
+			_add_log("最终裁决：按未击杀结算，战利品减半。")
+		_grant_battle_rewards(str(event.get("battle", "weak")), ruling)
+		_add_log("战斗胜利。")
 	else:
+		lose_count += 1
 		var penalty := int(balance.get("combat", {}).get("defeat_health", 10))
 		health = maxf(0.0, health - penalty)
 		_add_log("战斗失败：巢穴 -%d，士兵返场（HP 下场回满）。" % penalty)
@@ -607,6 +755,25 @@ func _finish_battle(victory: bool, ruling: bool = false) -> void:
 		_fail_game()
 		return
 	_advance_event()
+
+
+func _grant_battle_rewards(tier: String, ruling: bool) -> void:
+	var cfg: Dictionary = balance.get("combat", {}).get("rewards", {}).get(tier, {})
+	if cfg.is_empty():
+		return
+	var food_range: Array = cfg.get("food", [0, 0])
+	var food := rng.randi_range(int(food_range[0]), int(food_range[1]))
+	if ruling:
+		food = int(floor(float(food) / 2.0))
+	resources["food"] = int(resources["food"]) + food
+	var text := "战利品：食物 +%d" % food
+	if rng.randf() < float(cfg.get("warfruits", 0.0)):
+		warfruits["warspoil"] = int(warfruits.get("warspoil", 0)) + 1
+		text += "、战果 +1"
+	if rng.randf() < float(cfg.get("amber", 0.0)):
+		amber += 1
+		text += "、虫珀 +1"
+	_add_log(text + "。")
 
 
 func _next_ready_player() -> Dictionary:
@@ -632,6 +799,14 @@ func recruit(unit_id: String) -> bool:
 		_add_log("军队已满（%d/%d）。" % [army.size(), int(balance["army"]["max_size"])])
 		changed.emit()
 		return false
+	if recruit_free:
+		army.append(unit_id)
+		_add_log("免费招募 %s，军队 %d/%d。" % [
+			str(data.get("name", unit_id)), army.size(), int(balance["army"]["max_size"])
+		])
+		_finish_free_recruit()
+		changed.emit()
+		return true
 	if not _can_pay(data.get("cost", {})):
 		_add_log("资源不足，无法招募 %s。" % str(data.get("name", unit_id)))
 		changed.emit()
@@ -666,6 +841,10 @@ func refresh_recruit() -> bool:
 
 func skip_recruit() -> void:
 	if phase != Phase.RECRUIT:
+		return
+	if recruit_free:
+		_add_log("跳过本次免费招募。")
+		_finish_free_recruit()
 		return
 	_add_log("跳过招募。")
 	recruit_candidates = []
@@ -896,11 +1075,19 @@ func _end_turn() -> void:
 	turn += 1
 	if turn > TOTAL_TURNS:
 		phase = Phase.WON
-		_add_log("撑过四季，进入终局。")
+		_add_log("春季结束（6/6）。%s" % season_summary())
 		changed.emit()
 		return
 	season = int(floor(float(turn - 1) / float(TURNS_PER_SEASON)))
 	_begin_turn()
+
+
+func season_summary() -> String:
+	return "本季统计：食物 %+d（%d → %d），完整度 %+d（%d → %d），战斗 %d 场（胜 %d / 负 %d），虫珀 %d。" % [
+		int(resources["food"]) - run_start_food, run_start_food, int(resources["food"]),
+		int(health) - int(run_start_health), int(run_start_health), int(health),
+		battle_count, win_count, lose_count, amber
+	]
 
 
 func _fail_game() -> void:
@@ -1002,6 +1189,10 @@ func _apply_effects(effects: Dictionary) -> void:
 			var pool: Array = balance["actions"]["adventure"].get("seed_pool", [])
 			if not pool.is_empty():
 				seeds.append(str(pool[rng.randi_range(0, pool.size() - 1)]))
+	if effects.has("warspoil"):
+		warfruits["warspoil"] = int(warfruits.get("warspoil", 0)) + int(effects["warspoil"])
+	if effects.has("amber"):
+		amber += int(effects["amber"])
 
 
 # ---------------------------------------------------------------------------
@@ -1107,8 +1298,9 @@ func _harvest(info: Dictionary) -> void:
 	var name := str(info.get("name", "种子"))
 	match kind:
 		"food":
-			resources["food"] = int(resources["food"]) + amount
-			_add_log("【%s】收获：食物 +%d。" % [name, amount])
+			var bonus := int(balance.get("spring", {}).get("seed_food_bonus", 0)) if season == 0 else 0
+			resources["food"] = int(resources["food"]) + amount + bonus
+			_add_log("【%s】收获：食物 +%d。" % [name, amount + bonus])
 		"warspoil":
 			var id := str(info.get("id", name))
 			warfruits[id] = int(warfruits.get(id, 0)) + amount
