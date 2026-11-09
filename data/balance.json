@@ -1,0 +1,87 @@
+{
+  "max_health": 100,
+  "start": {
+    "health": 60,
+    "food": 15,
+    "workers": 4,
+    "nest_level": 2,
+    "seed": "grain_basic",
+    "army": ["ruishi", "chihou", "caiwei"]
+  },
+  "queen": {
+    "workers_per_turn": 2
+  },
+  "heal": {
+    "per_worker": 0.6,
+    "cap": 5.0
+  },
+  "actions": {
+    "adventure": {
+      "food_min": 2,
+      "food_max": 4,
+      "workers_min": 1,
+      "workers_max": 3,
+      "seed_chance": 0.35,
+      "health": -2,
+      "seed_pool": ["grain_rich", "resin", "venom", "heal_fungus"]
+    },
+    "heal": {
+      "food_cost": 4,
+      "health": 18
+    },
+    "expand": {
+      "exp_threshold": [0, 0, 25, 35]
+    }
+  },
+  "nest": {
+    "max_level": 4,
+    "fertile_per_ring": 3
+  },
+  "army": {
+    "max_size": 7,
+    "front": 4,
+    "back": 3
+  },
+  "recruit": {
+    "refresh_cost": 3
+  },
+  "combat": {
+    "defeat_health": 10
+  },
+  "weather": {
+    "names": { "clear": "晴", "rain": "雨", "cloudy": "多云" },
+    "weights": [
+      { "clear": 2, "rain": 4, "cloudy": 4 },
+      { "clear": 5, "rain": 2, "cloudy": 3 },
+      { "clear": 4, "rain": 3, "cloudy": 3 },
+      { "clear": 2, "rain": 3, "cloudy": 5 }
+    ],
+    "effects": {
+      "clear": { "adventure_food": 1 },
+      "rain": { "adventure_workers": 1, "adventure_health": -1, "supply_mult": 1.5 },
+      "cloudy": {}
+    }
+  },
+  "season_modifier": [
+    { "adventure_food": 0 },
+    { "adventure_food": 0 },
+    { "adventure_food": 1 },
+    { "adventure_food": 0 }
+  ],
+  "event_groups_per_turn": 3,
+  "location": "river",
+  "locations": {
+    "river": {
+      "name": "河边",
+      "blocked_dirs": [3]
+    },
+    "house": {
+      "name": "人类房屋边",
+      "blocked_dirs": [1, 4]
+    },
+    "desert": {
+      "name": "沙漠",
+      "blocked_dirs": []
+    }
+  }
+}

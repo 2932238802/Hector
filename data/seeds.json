@@ -1,0 +1,50 @@
+﻿{
+  "seeds": [
+    {
+      "id": "grain_basic",
+      "name": "基础谷种",
+      "kind": "food",
+      "period": 3,
+      "yield": 2,
+      "source": "开局",
+      "desc": "经济主力：每 3 个事件产出 2 食物。"
+    },
+    {
+      "id": "grain_rich",
+      "name": "丰产块根",
+      "kind": "food",
+      "period": 5,
+      "yield": 4,
+      "source": "探索",
+      "desc": "空窗更长：每 5 个事件产出 4 食物。"
+    },
+    {
+      "id": "resin",
+      "name": "树脂种",
+      "kind": "warspoil",
+      "period": 3,
+      "yield": 1,
+      "source": "探索",
+      "desc": "每 3 个事件产出 1 份树脂（战果占位）。"
+    },
+    {
+      "id": "venom",
+      "name": "毒液种",
+      "kind": "warspoil",
+      "period": 3,
+      "yield": 1,
+      "source": "探索",
+      "desc": "每 3 个事件产出 1 份毒液（战果占位）。"
+    },
+    {
+      "id": "heal_fungus",
+      "name": "愈合菌圃",
+      "kind": "tool_heal",
+      "period": 5,
+      "yield": 6,
+      "source": "探索",
+      "desc": "每 5 个事件恢复 6 点巢穴完整度。"
+    }
+  ]
+}
+

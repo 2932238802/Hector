@@ -1,0 +1,129 @@
+{
+  "categories": ["enemy", "self", "creature", "explore", "weather"],
+  "events": [
+    {
+      "id": "enemy_raid",
+      "category": "enemy",
+      "pressure": true,
+      "title": "宿敌来袭",
+      "text": "邻巢的兵蚁沿着旧路摸到入口，前排已经顶了上来。",
+      "battle": "weak",
+      "effects": { "food": 3 }
+    },
+    {
+      "id": "enemy_scout",
+      "category": "enemy",
+      "pressure": true,
+      "title": "侦察兵试探",
+      "text": "几只敌巢侦察蚁在洞口打转，试探防守的空隙。",
+      "battle": "weak",
+      "effects": { "food": 2 }
+    },
+    {
+      "id": "enemy_swarm",
+      "category": "enemy",
+      "pressure": true,
+      "title": "虫群压境",
+      "text": "黑压压的一片从草丛里涌过来，这一次不是试探。",
+      "battle": "strong",
+      "effects": { "food": 5 }
+    },
+    {
+      "id": "self_brood",
+      "category": "self",
+      "pressure": false,
+      "title": "扩建育婴室",
+      "text": "多余的幼虫被移到新挖的腔室，工蚁的数量涨了一截。",
+      "recruit": true,
+      "effects": { "workers": 2 }
+    },
+    {
+      "id": "self_tunnel",
+      "category": "self",
+      "pressure": false,
+      "title": "掘进新通道",
+      "text": "工蚁在侧壁挖出一条斜井，碎石堆在洞口。",
+      "effects": { "food": 3 }
+    },
+    {
+      "id": "self_trade",
+      "category": "self",
+      "pressure": false,
+      "title": "内部调剂",
+      "text": "把储粮重新分配了一遍，省下一些，也翻出一些。",
+      "effects": { "food": 4 }
+    },
+    {
+      "id": "creature_beetle",
+      "category": "creature",
+      "pressure": false,
+      "title": "受伤的甲虫",
+      "text": "一只甲虫翻着肚皮卡在石缝里，还能动。",
+      "effects": { "food": 2 }
+    },
+    {
+      "id": "creature_parasite",
+      "category": "creature",
+      "pressure": true,
+      "title": "寄生虫侵入",
+      "text": "几只工蚁开始不受控制地打转，身上挂着细线。",
+      "effects": { "health": -5, "workers": -2 }
+    },
+    {
+      "id": "creature_fungus",
+      "category": "creature",
+      "pressure": false,
+      "title": "共生菌圃",
+      "text": "墙角长出一片白霉，闻起来是能用的东西。",
+      "effects": { "seed": "heal_fungus", "food": 1 }
+    },
+    {
+      "id": "explore_seed",
+      "category": "explore",
+      "pressure": false,
+      "title": "发现种子",
+      "text": "在倒木下面摸到几粒硬壳种子，不知道会长出什么。",
+      "effects": { "seed": true, "food": 2 }
+    },
+    {
+      "id": "explore_ruin",
+      "category": "explore",
+      "pressure": true,
+      "title": "废弃巢穴",
+      "text": "半塌的旧巢里还有能用的储粮，也有不肯走的东西。",
+      "effects": { "health": -3, "food": 5 }
+    },
+    {
+      "id": "explore_river",
+      "category": "explore",
+      "pressure": false,
+      "title": "河岸冲积",
+      "text": "退水后的泥滩上摊着一层能吃的碎屑。",
+      "effects": { "food": 5 }
+    },
+    {
+      "id": "weather_rain",
+      "category": "weather",
+      "pressure": true,
+      "title": "连阴雨",
+      "text": "雨水顺着入口灌进来，巢壁一直在渗水。",
+      "effects": { "health": -2, "food": -2 }
+    },
+    {
+      "id": "weather_drought",
+      "category": "weather",
+      "pressure": true,
+      "title": "干旱",
+      "text": "表层土干得发硬，采集队空着手回来。",
+      "effects": { "food": -4 }
+    },
+    {
+      "id": "weather_clear",
+      "category": "weather",
+      "pressure": false,
+      "title": "晴好天气",
+      "text": "日头正好，采集队来回跑得很快。",
+      "effects": { "food": 2 }
+    }
+  ]
+}
