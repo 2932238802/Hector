@@ -1,13 +1,13 @@
 {
   "units": [
     { "id": "ruishi", "name": "锐士", "tier": 1, "pool": "shared", "cost": { "food": 8 }, "supply": 1, "hp": 10.0, "atk": 3.0, "ap": 1, "row": "front", "combat": true, "tag": "前排主力", "signature": "成长：每次攻击永久 +0.2 攻击（无上限）" },
-    { "id": "chihou", "name": "斥候", "tier": 1, "pool": "shared", "cost": { "food": 5 }, "supply": 1, "hp": 7.0, "atk": 2.0, "ap": 1, "row": "front", "combat": true, "tag": "情报 / 战果", "signature": "迅捷：开场得【占风】；不甘：阵亡得【遗报】（均占位）" },
+    { "id": "chihou", "name": "斥候", "tier": 1, "pool": "shared", "cost": { "food": 5 }, "supply": 1, "hp": 7.0, "atk": 2.0, "ap": 1, "row": "front", "combat": true, "tag": "情报 / 战果", "signature": "迅捷：开场得【迅捷】；不甘：阵亡得【不甘】（均占位）" },
     { "id": "caiwei", "name": "采薇", "tier": 1, "pool": "shared", "cost": { "food": 6 }, "supply": 1, "hp": 6.0, "atk": 1.5, "ap": 1, "row": "back", "combat": true, "tag": "战斗结算型经济", "signature": "采撷：胜利或存活时额外 +1–3 食物" },
-    { "id": "gancheng", "name": "干城", "tier": 1, "pool": "shared", "cost": { "food": 9 }, "supply": 2, "hp": 16.0, "atk": 2.0, "ap": 1, "row": "front", "combat": true, "tag": "防御", "signature": "扼守 + 格挡 3.0 护盾/轮 + 受伤成长" },
+    { "id": "gancheng", "name": "干城", "tier": 1, "pool": "shared", "cost": { "food": 9 }, "supply": 2, "hp": 16.0, "atk": 1.0, "ap": 1, "row": "front", "combat": true, "tag": "防御", "signature": "扼守 + 格挡 3.0 护盾/轮 + 受伤成长" },
     { "id": "fenzu", "name": "焚卒", "tier": 1, "pool": "shared", "cost": { "food": 6 }, "supply": 1, "hp": 8.0, "atk": 2.0, "ap": 1, "row": "front", "combat": true, "tag": "自爆", "signature": "自爆：1 AP 阵亡，不甘打敌方前排 ×50%" },
     { "id": "nushou", "name": "弩手", "tier": 1, "pool": "shared", "cost": { "food": 7 }, "supply": 1, "hp": 6.0, "atk": 3.0, "ap": 1, "row": "back", "combat": true, "tag": "后排输出", "signature": "连射：每次攻击 30% 得 +1 AP，可连锁" },
     { "id": "fubing", "name": "辅兵", "tier": 1, "pool": "shared", "cost": { "food": 7 }, "supply": 1, "hp": 7.0, "atk": 2.0, "ap": 1, "row": "back", "combat": true, "tag": "后排支援", "signature": "庇护：每轮随机 1 名友军 +5 护盾" },
-    { "id": "fuzhe", "name": "缚者", "tier": 1, "pool": "shared", "cost": { "food": 8 }, "supply": 1, "hp": 8.0, "atk": 2.0, "ap": 1, "row": "back", "combat": true, "tag": "控制 / 削弱", "signature": "缠缚：每轮给 1 个敌人【削弱】（攻击 ×50%）" },
+    { "id": "fuzhe", "name": "缚者", "tier": 1, "pool": "shared", "cost": { "food": 8 }, "supply": 1, "hp": 6.0, "atk": 1.5, "ap": 1, "row": "back", "combat": true, "tag": "控制 / 削弱", "signature": "缠缚：每轮给 1 个敌人【削弱】（攻击 ×50%）" },
     { "id": "chuanling", "name": "传令", "tier": 2, "pool": "shared", "cost": { "food": 10 }, "supply": 2, "hp": 11.0, "atk": 2.0, "ap": 1, "row": "back", "combat": true, "tag": "行动点调度", "signature": "每场 1 次：令 1 名友军本轮 +1 AP" },
     { "id": "hanzu", "name": "悍卒", "tier": 2, "pool": "shared", "cost": { "food": 10 }, "supply": 2, "hp": 15.0, "atk": 2.5, "ap": 1, "row": "front", "combat": true, "tag": "逆境前排", "signature": "悍勇：每轮首次实际掉血后，本场攻击 +1.0" },
     { "id": "duizheng", "name": "队正", "tier": 2, "pool": "shared", "cost": { "food": 11 }, "supply": 2, "hp": 13.0, "atk": 2.0, "ap": 1, "row": "back", "combat": true, "tag": "阵型增幅", "signature": "整阵：存活时同排友军每轮 +1.0 护盾" },
