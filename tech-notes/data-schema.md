@@ -79,11 +79,11 @@ last-review: 2026-11-09
 
 ```json
 {
-  "categories": ["enemy", "self", "creature", "explore", "weather"],
+  "categories": ["enemy_weak", "enemy_strong", "explore", "random", "recruit", "relic"],
   "events": [
     {
       "id": "enemy_raid",
-      "category": "enemy",
+      "category": "enemy_weak",
       "pressure": true,
       "title": "宿敌来袭",
       "text": "……",
@@ -97,14 +97,38 @@ last-review: 2026-11-09
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
 | `id` | string | 是 | 唯一，`<category>_<name>` |
-| `category` | string | 是 | 必须是 `categories` 里的值 |
+| `category` | string | 是 | 6 类之一：`enemy_weak` / `enemy_strong` / `explore` / `random` / `recruit` / `relic` |
 | `pressure` | bool | 是 | 是否压力事件（每组至少 1 个） |
 | `season` | int | 否 | 0–3 限定季节；缺省 = 全季可用 |
 | `title` | string | 是 | 事件名 |
 | `text` | string | 是 | 事件描述，一句话 |
-| `battle` | string | 否 | 指定 `enemies.json` 的 tier；有该字段则先进战斗 |
+| `battle` | string | 否 | 指定 `enemies.json` 的 tier；有该字段则先让玩家选迎战 / 谈判 / 回避 |
 | `recruit` | bool | 否 | `true` 时结算后进入招募面板 |
 | `effects` | object | 是 | 结算效果，见下 |
+
+> 敌对事件不再自动开战：`ready_up()` 只提示选择，必须调用
+> `choose_encounter("fight" / "talk" / "avoid")`。谈判扣 2 食物、回避免费，均为占位（Q-084）。
+
+## 3.5 `data/event_templates.json`
+
+```json
+{
+  "templates": [
+    { "id": "patrol", "name": "巡逻组", "slots": ["enemy_weak", "explore", "random", "random"], "crisis": false, "relic": false }
+  ],
+  "season_weights": {
+    "0": { "patrol": 35, "expedition": 20, "elite": 15, "crisis": 10, "relic": 10, "recruit": 10 }
+  }
+}
+```
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `templates[].id` / `name` | string | 模板 id / 显示名（巡逻组等 6 种） |
+| `templates[].slots` | string[] | 4 个类别槽位，顺序即组内事件顺序 |
+| `templates[].crisis` | bool | 是否危机组（本轮最多 1 个） |
+| `templates[].relic` | bool | 是否含遗迹（本轮最多 1 个） |
+| `season_weights.<0-3>.<id>` | int | 按季节的模板权重 |
 
 `effects` 可用键（都可省略）：
 
@@ -180,10 +204,11 @@ unit = { "name", "hp", "max_hp", "atk", "ap", "max_ap", "shield", "row", "alive"
 
 事件组生成（`EventPool`）：
 
-1. 每组 4 个事件（`GROUP_SIZE`）。
-2. 4 个事件类别互不相同。
-3. 至少 1 个 `pressure=true`；不足时用同类别压力事件替换。
-4. 季节过滤：`season == -1` 或等于当前季节。
+1. 每组 4 个事件（`GROUP_SIZE`），类别由模板 `slots` 决定，同类最多 2 个。
+2. 每组至少 1 个敌对势力（`enemy_weak` / `enemy_strong`）。
+3. 每轮 3 组，模板互不重复；最多 1 个危机组、1 个含遗迹模板。
+4. 季节过滤：`season == -1` 或等于当前季节；同一轮内尽量不重复事件 id。
+5. 敌对事件不自动开战，必须经 `choose_encounter`（迎战 / 谈判 / 回避）。
 
 时间 / 经济（`GameState`）：
 

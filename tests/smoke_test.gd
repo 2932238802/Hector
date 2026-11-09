@@ -22,6 +22,7 @@ func _initialize() -> void:
 	_test_target_rules()
 	_test_final_ruling()
 	_test_battle_defeat()
+	_test_encounter_options()
 	_test_recruit()
 	_test_recruit_tiers()
 	_test_unit_pool()
@@ -145,17 +146,35 @@ func _test_turn_flow() -> void:
 func _test_group_rules() -> void:
 	for game_index in 20:
 		var game = GameStateScript.new(2000 + game_index)
+		var templates := {}
+		var crisis := 0
+		var relic := 0
 		for group in game.groups:
 			var events: Array = group["events"]
 			check(events.size() == 4, "group has 4 events")
-			var categories := {}
+			var category_counts := {}
+			var enemy_count := 0
 			var pressure := 0
 			for event in events:
-				categories[event["category"]] = true
+				var category := str(event["category"])
+				category_counts[category] = int(category_counts.get(category, 0)) + 1
+				if category in ["enemy_weak", "enemy_strong"]:
+					enemy_count += 1
 				if bool(event["pressure"]):
 					pressure += 1
-			check(categories.size() == 4, "group categories are distinct")
+			check(enemy_count >= 1, "group has at least 1 enemy event")
 			check(pressure >= 1, "group has at least 1 pressure event")
+			for category in category_counts.keys():
+				check(int(category_counts[category]) <= 2, "no category appears 3 times")
+			templates[str(group.get("template", ""))] = true
+			if str(group.get("template", "")) == "crisis":
+				crisis += 1
+			if bool(group.get("slots", []).has("relic")):
+				relic += 1
+		check(game.groups.size() == 3, "3 groups per turn")
+		check(templates.size() == game.groups.size(), "templates are distinct within a turn")
+		check(crisis <= 1, "at most 1 crisis group per turn")
+		check(relic <= 1, "at most 1 relic group per turn")
 
 
 func _test_determinism() -> void:
@@ -186,7 +205,7 @@ func _test_weather() -> void:
 		"id": "weather_battle", "category": "enemy", "pressure": true,
 		"title": "雨天敌袭", "text": "", "battle": "weak", "effects": {},
 	})
-	battle_game.ready_up()
+	battle_game.choose_encounter("fight")
 	check(battle_game.phase == GameStateScript.Phase.DEPLOY, "rain battle enters DEPLOY")
 	check(battle_game.deploy_supply() == 5, "rain raises battle supply 3 -> 5")
 	var food_before := int(battle_game.resources["food"])
@@ -224,7 +243,7 @@ func _test_battle() -> void:
 	})
 	var food_before := int(game.resources["food"])
 	game.weather = "clear"
-	check(game.ready_up(), "ready_up opens deployment")
+	check(game.choose_encounter("fight"), "encounter fight opens deployment")
 	check(game.phase == GameStateScript.Phase.DEPLOY, "enters DEPLOY phase")
 	check(game.deploy_units.size() == 3, "all 3 units listed for deployment")
 	check(game.deployed_count() == 3, "all units deployed by default")
@@ -256,7 +275,7 @@ func _test_target_rules() -> void:
 		"id": "test_targets", "category": "enemy", "pressure": true,
 		"title": "前后排测试", "text": "", "battle": "strong", "effects": {"food": 5},
 	})
-	game.ready_up()
+	game.choose_encounter("fight")
 	game.start_battle()
 	check(game.phase == GameStateScript.Phase.BATTLE, "strong battle starts")
 	check(game.battle["enemies"]["front"].size() == 3, "strong tier front = 3")
@@ -274,7 +293,7 @@ func _test_final_ruling() -> void:
 		"id": "test_ruling", "category": "enemy", "pressure": true,
 		"title": "僵局", "text": "", "battle": "strong", "effects": {"food": 5},
 	})
-	game.ready_up()
+	game.choose_encounter("fight")
 	game.start_battle()
 	var food_after_supply := int(game.resources["food"])
 	for row in ["front", "back"]:
@@ -304,13 +323,37 @@ func _test_battle_defeat() -> void:
 		"title": "必败战斗", "text": "", "battle": "strong", "effects": {"food": 5},
 	})
 	var health_before: float = game.health
-	game.ready_up()
+	game.choose_encounter("fight")
 	game.start_battle()
 	_auto_battle(game)
 
 	check(game.phase != GameStateScript.Phase.BATTLE, "defeat ends the battle")
 	check(is_equal_approx(game.health, maxf(0.0, health_before - 10.0)), "defeat costs 10 nest health")
 	check(game.army.size() == 1, "soldier returns after defeat")
+
+
+func _test_encounter_options() -> void:
+	var game = GameStateScript.new(560)
+	_force_single_event(game, {
+		"id": "test_talk", "category": "enemy_weak", "pressure": true,
+		"title": "谈判测试", "text": "", "battle": "weak", "effects": {"food": 3},
+	})
+	check(not game.ready_up(), "battle event requires an encounter choice")
+	var food_before := int(game.resources["food"])
+	check(game.choose_encounter("talk"), "talk resolves the encounter")
+	check(int(game.resources["food"]) == food_before - 2, "talk costs 2 food (placeholder)")
+	check(game.event_index == 1, "talk advances the event")
+	check(game.battle.is_empty(), "talk never starts a battle")
+
+	var avoid_game = GameStateScript.new(561)
+	_force_single_event(avoid_game, {
+		"id": "test_avoid", "category": "enemy_weak", "pressure": true,
+		"title": "回避测试", "text": "", "battle": "weak", "effects": {"food": 3},
+	})
+	var food_avoid := int(avoid_game.resources["food"])
+	check(avoid_game.choose_encounter("avoid"), "avoid resolves the encounter")
+	check(int(avoid_game.resources["food"]) == food_avoid, "avoid is free")
+	check(avoid_game.event_index == 1, "avoid advances the event")
 
 
 func _test_recruit() -> void:
@@ -435,7 +478,10 @@ func _test_full_run() -> void:
 			GameStateScript.Phase.GROUP_SELECT:
 				game.choose_group(0)
 			GameStateScript.Phase.EVENT:
-				game.ready_up()
+				if game.current_event().has("battle"):
+					game.choose_encounter("fight")
+				else:
+					game.ready_up()
 			GameStateScript.Phase.DEPLOY:
 				if game.can_start_battle():
 					game.start_battle()
@@ -478,7 +524,10 @@ func _play_until_turn_end(game) -> void:
 	while guard < 500:
 		guard += 1
 		if game.phase == GameStateScript.Phase.EVENT:
-			game.ready_up()
+			if game.current_event().has("battle"):
+				game.choose_encounter("fight")
+			else:
+				game.ready_up()
 		elif game.phase == GameStateScript.Phase.DEPLOY:
 			if game.can_start_battle():
 				game.start_battle()

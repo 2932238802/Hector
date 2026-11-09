@@ -1,0 +1,16 @@
+{
+  "templates": [
+    { "id": "patrol", "name": "巡逻组", "slots": ["enemy_weak", "explore", "random", "random"], "crisis": false, "relic": false },
+    { "id": "expedition", "name": "远征组", "slots": ["enemy_weak", "explore", "explore", "recruit"], "crisis": false, "relic": false },
+    { "id": "elite", "name": "强敌组", "slots": ["enemy_strong", "explore", "random", "relic"], "crisis": false, "relic": true },
+    { "id": "crisis", "name": "危机组", "slots": ["enemy_weak", "enemy_strong", "random", "explore"], "crisis": true, "relic": false },
+    { "id": "relic", "name": "遗迹组", "slots": ["enemy_weak", "relic", "explore", "random"], "crisis": false, "relic": true },
+    { "id": "recruit", "name": "招募组", "slots": ["enemy_weak", "recruit", "random", "explore"], "crisis": false, "relic": false }
+  ],
+  "season_weights": {
+    "0": { "patrol": 35, "expedition": 20, "elite": 15, "crisis": 10, "relic": 10, "recruit": 10 },
+    "1": { "patrol": 25, "expedition": 35, "elite": 5, "crisis": 5, "relic": 10, "recruit": 20 },
+    "2": { "patrol": 30, "expedition": 20, "elite": 10, "crisis": 5, "relic": 20, "recruit": 15 },
+    "3": { "patrol": 25, "expedition": 10, "elite": 30, "crisis": 20, "relic": 10, "recruit": 5 }
+  }
+}

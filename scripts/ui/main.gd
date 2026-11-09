@@ -31,12 +31,18 @@ func _ready() -> void:
 	_maybe_capture()
 
 
-## 开发用：-- --demo-deploy / --demo-battle / --demo-recruit 直接进入布阵 / 战斗 / 招募。
+## 开发用：-- --demo-event / --demo-deploy / --demo-battle / --demo-recruit 直达对应界面。
 func _maybe_demo() -> void:
 	var args := OS.get_cmdline_user_args()
-	if not ("--demo-deploy" in args or "--demo-battle" in args or "--demo-recruit" in args):
+	if not (
+		"--demo-deploy" in args
+		or "--demo-battle" in args
+		or "--demo-recruit" in args
+		or "--demo-event" in args
+	):
 		return
 	var is_recruit := "--demo-recruit" in args
+	var show_event := "--demo-event" in args
 	var demo_event := {
 		"id": "demo_battle" if not is_recruit else "demo_recruit",
 		"category": "self" if is_recruit else "enemy",
@@ -56,7 +62,10 @@ func _maybe_demo() -> void:
 	}
 	game.event_index = 0
 	game.phase = GameStateScript.Phase.EVENT
-	game.ready_up()
+	if is_recruit:
+		game.ready_up()
+	elif not show_event:
+		game.choose_encounter("fight")
 	if "--demo-battle" in args:
 		game.start_battle()
 
@@ -434,14 +443,32 @@ func _build_event() -> void:
 		side_box.add_child(_hint("敌方：%s · 我方补给 %d 食物" % [
 			game.battle_tier_name(str(event["battle"])), game.army_supply()
 		]))
+		side_box.add_child(_hint("谈判代价 2 食物为占位（Q-084）；回避放弃战利品。"))
+		var fight_button := Button.new()
+		fight_button.text = "迎战（进入布阵）"
+		fight_button.custom_minimum_size = Vector2(0, 48)
+		fight_button.pressed.connect(_on_encounter.bind("fight"))
+		side_box.add_child(fight_button)
+
+		var talk_button := Button.new()
+		talk_button.text = "谈判（-2 食物，不战斗）"
+		talk_button.custom_minimum_size = Vector2(0, 44)
+		talk_button.disabled = int(game.resources["food"]) < 2
+		talk_button.pressed.connect(_on_encounter.bind("talk"))
+		side_box.add_child(talk_button)
+
+		var avoid_button := Button.new()
+		avoid_button.text = "回避（放弃战利品）"
+		avoid_button.custom_minimum_size = Vector2(0, 44)
+		avoid_button.pressed.connect(_on_encounter.bind("avoid"))
+		side_box.add_child(avoid_button)
 	else:
 		side_box.add_child(_hint("进度 %d/4" % (game.event_index + 1)))
-
-	var button := Button.new()
-	button.text = "布阵迎战" if is_battle else "准备就绪"
-	button.custom_minimum_size = Vector2(0, 52)
-	button.pressed.connect(_on_ready_up)
-	side_box.add_child(button)
+		var button := Button.new()
+		button.text = "准备就绪"
+		button.custom_minimum_size = Vector2(0, 52)
+		button.pressed.connect(_on_ready_up)
+		side_box.add_child(button)
 
 
 func _build_deploy() -> void:
@@ -691,6 +718,10 @@ func _on_start_battle() -> void:
 
 func _on_avoid() -> void:
 	game.avoid_battle()
+
+
+func _on_encounter(option: String) -> void:
+	game.choose_encounter(option)
 
 
 func _on_plant(seed_id: String) -> void:

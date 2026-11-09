@@ -18,6 +18,7 @@ const EVENT_LETTERS := ["A", "B", "C", "D"]
 
 var balance: Dictionary = {}
 var event_data: Dictionary = {}
+var event_templates_data: Dictionary = {}
 var units_data: Dictionary = {}
 var enemies_data: Dictionary = {}
 var seeds_data: Dictionary = {}
@@ -57,6 +58,7 @@ var logs: Array[String] = []
 func _init(p_seed: int = 0) -> void:
 	balance = _load_json("res://data/balance.json")
 	event_data = _load_json("res://data/events.json")
+	event_templates_data = _load_json("res://data/event_templates.json")
 	units_data = _load_json("res://data/units.json")
 	enemies_data = _load_json("res://data/enemies.json")
 	seeds_data = _load_json("res://data/seeds.json")
@@ -122,7 +124,7 @@ func _begin_turn() -> void:
 	health = minf(max_health(), health + heal_amount)
 
 	groups = EventPoolScript.build_groups(
-		rng, event_data, int(balance["event_groups_per_turn"]), season
+		rng, event_data, event_templates_data, int(balance["event_groups_per_turn"]), season
 	)
 	event_index = 0
 	active_group = {}
@@ -186,13 +188,46 @@ func ready_up() -> bool:
 		return false
 
 	if event.has("battle"):
-		_open_deploy(event)
+		_add_log("敌对遭遇：选择「迎战」「谈判」或「回避」。")
 		changed.emit()
-		return true
+		return false
 
 	_resolve_event(event)
 	changed.emit()
 	return true
+
+
+func choose_encounter(option: String) -> bool:
+	if phase != Phase.EVENT:
+		return false
+	var event := current_event()
+	if event.is_empty() or not event.has("battle"):
+		return false
+	match option:
+		"fight":
+			_open_deploy(event)
+			changed.emit()
+			return true
+		"talk":
+			# 谈判代价为占位：Q-084 未定具体食物数。
+			var cost := 2
+			if int(resources["food"]) < cost:
+				_add_log("食物不足 %d，无法谈判。" % cost)
+				changed.emit()
+				return false
+			resources["food"] = int(resources["food"]) - cost
+			_add_log("谈判：支付 %d 食物，避开战斗（代价为占位，Q-084）。" % cost)
+			_tick_planted()
+			_advance_event()
+			changed.emit()
+			return true
+		"avoid":
+			_add_log("回避：绕开这场战斗，放弃战利品。")
+			_tick_planted()
+			_advance_event()
+			changed.emit()
+			return true
+	return false
 
 
 # ---------------------------------------------------------------------------
