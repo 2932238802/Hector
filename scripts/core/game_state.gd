@@ -466,6 +466,7 @@ func start_battle() -> bool:
 
 	var enemies_front: Array = []
 	var enemies_back: Array = []
+	var enemy_skipped := 0
 	for template in _tier_units(str(pending_event.get("battle", "weak"))):
 		for i in int(template.get("count", 1)):
 			var enemy_mult := float(balance.get("spring", {}).get("enemy_scale", 1.0))
@@ -476,15 +477,22 @@ func start_battle() -> bool:
 				int(template.get("ap", 1)),
 				str(template.get("row", "front"))
 			)
+			# 敌我阵列一致：前排 4 / 后排 3；按模板自身站位放，放不下就跳过（不串排）。
 			if str(unit["row"]) == "front" and enemies_front.size() < _row_cap("front"):
 				enemies_front.append(unit)
-			elif enemies_back.size() < _row_cap("back"):
-				unit["row"] = "back"
+			elif str(unit["row"]) == "back" and enemies_back.size() < _row_cap("back"):
 				enemies_back.append(unit)
+			else:
+				enemy_skipped += 1
+				continue
 			for key in ["shield_per_round", "weaken_chance", "weaken_per_round", "bypass_first"]:
 				if template.has(key):
 					unit[key] = template[key]
 			unit["first_attack_used"] = false
+	if enemy_skipped > 0:
+		_add_log("敌方阵列已满（前 %d / 后 %d），跳过 %d 个敌人。" % [
+			_row_cap("front"), _row_cap("back"), enemy_skipped
+		])
 
 	battle = {
 		"player": {"front": players_front, "back": players_back},

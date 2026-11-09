@@ -22,6 +22,7 @@ func _initialize() -> void:
 	_test_determinism()
 	_test_weather()
 	_test_battle()
+	_test_enemy_formation()
 	_test_target_rules()
 	_test_final_ruling()
 	_test_battle_defeat()
@@ -351,6 +352,24 @@ func _test_battle() -> void:
 	var loot := int(game.resources["food"]) - food_before
 	check(loot >= 2 and loot <= 4, "victory gives 2-4 food loot (got %d)" % loot)
 	check(game.health > 0.0, "victory does not damage the nest")
+
+
+func _test_enemy_formation() -> void:
+	var game = _boot(4242)
+	game.enemies_data = {"tiers": {"test": {"name": "阵列测试", "units": [
+		{"name": "前", "hp": 5.0, "atk": 1.0, "ap": 1, "row": "front", "count": 6},
+		{"name": "后", "hp": 5.0, "atk": 1.0, "ap": 1, "row": "back", "count": 4},
+	]}}}
+	_force_single_event(game, {
+		"id": "test_formation", "category": "enemy_weak", "pressure": true,
+		"title": "阵列测试", "text": "", "battle": "test", "effects": {},
+	})
+	check(game.choose_encounter("fight"), "formation encounter enters deploy")
+	check(game.start_battle(), "formation battle starts")
+	check(game.battle["enemies"]["front"].size() == 4, "enemy front row caps at 4")
+	check(game.battle["enemies"]["back"].size() == 3, "enemy back row caps at 3")
+	check(str(game.battle["enemies"]["front"][0]["row"]) == "front", "front enemies stay front")
+	check(str(game.battle["enemies"]["back"][0]["row"]) == "back", "back enemies stay back")
 
 
 func _test_target_rules() -> void:
