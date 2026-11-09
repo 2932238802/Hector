@@ -559,7 +559,7 @@ func _test_unit_pool() -> void:
 	check(counts[1] == 12, "tier 1 has 12 units (8 shared + 4 exclusive)")
 	check(counts[2] == 8, "tier 2 has 8 units (3 shared + 5 exclusive)")
 	check(counts[3] == 4, "tier 3 has 4 units (1 shared + 3 exclusive)")
-	check(game.unit_info("tunzu").get("name", "") == "囤卒", "exclusive unit is present")
+	check(game.unit_info("tunzu").get("name", "") == "仓士", "exclusive unit is present")
 
 
 func _test_data_store() -> void:
