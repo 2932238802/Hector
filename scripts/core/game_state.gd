@@ -50,6 +50,7 @@ var deploy_units: Array = []
 var pending_event: Dictionary = {}
 var recruit_candidates: Array[String] = []
 var recruit_refreshed := false
+var recruit_pity_tier := 0
 var logs: Array[String] = []
 
 
@@ -87,6 +88,7 @@ func start_new_game(p_seed: int = 0) -> void:
 	battle = {}
 	recruit_candidates = []
 	recruit_refreshed = false
+	recruit_pity_tier = 0
 	logs = []
 
 	location = str(balance.get("location", "river"))
@@ -688,23 +690,85 @@ func _open_recruit() -> void:
 	recruit_candidates = _roll_recruits()
 	recruit_refreshed = false
 	phase = Phase.RECRUIT
-	_add_log("招募事件：3 个候选，选 1；可花 %d 食物刷新一次。" % int(balance["recruit"]["refresh_cost"]))
+	if recruit_candidates.is_empty():
+		_add_log("招募事件：没有付得起的兵种，只能跳过。")
+	else:
+		_add_log("招募事件：%d 个候选，选 1；可花 %d 食物刷新一次。" % [
+			recruit_candidates.size(), int(balance["recruit"]["refresh_cost"])
+		])
 
 
 func _roll_recruits() -> Array[String]:
-	var pool: Array[String] = []
+	var rates := _tier_rates()
+	var pool_by_tier := {}
 	for unit in units_data.get("units", []):
-		if bool(unit.get("combat", false)):
-			pool.append(str(unit["id"]))
+		if not bool(unit.get("combat", false)):
+			continue
+		var tier := int(unit.get("tier", 1))
+		if tier > nest_level:
+			continue
+		if int(unit.get("cost", {}).get("food", 0)) > int(resources["food"]):
+			continue
+		if not pool_by_tier.has(tier):
+			pool_by_tier[tier] = []
+		pool_by_tier[tier].append(str(unit["id"]))
 
 	var picked: Array[String] = []
-	var candidates := pool.duplicate()
-	EventPoolScript.shuffle(rng, candidates)
-	for unit_id in candidates:
-		if picked.size() >= 3:
-			break
-		picked.append(str(unit_id))
+	# 升阶保底：扩建后的第一次招募至少 1 个新阶级（Q-103）。
+	if recruit_pity_tier > 1:
+		var new_tier_pool: Array = pool_by_tier.get(recruit_pity_tier, [])
+		if new_tier_pool.is_empty():
+			_add_log("升阶保底：没有付得起的%s单位，本次不保底。" % tier_name(recruit_pity_tier))
+		else:
+			picked.append(str(new_tier_pool[rng.randi_range(0, new_tier_pool.size() - 1)]))
+			_add_log("升阶保底：本次招募必出%s。" % tier_name(recruit_pity_tier))
+		recruit_pity_tier = 0
+
+	var all_affordable: Array[String] = []
+	for tier in pool_by_tier.keys():
+		for unit_id in pool_by_tier[tier]:
+			all_affordable.append(str(unit_id))
+	if all_affordable.is_empty():
+		return picked
+
+	var want := int(balance["recruit"].get("candidates", 3))
+	while picked.size() < want:
+		var tier := _roll_tier(rates)
+		var pool: Array = pool_by_tier.get(tier, [])
+		if pool.is_empty():
+			pool = all_affordable
+		picked.append(str(pool[rng.randi_range(0, pool.size() - 1)]))
 	return picked
+
+
+func _tier_rates() -> Array:
+	var table: Dictionary = balance["recruit"].get("tier_rates", {})
+	var key := str(nest_level)
+	if table.has(key):
+		return table[key]
+	return table.get("4", [])
+
+
+func _roll_tier(rates: Array) -> int:
+	if rates.is_empty():
+		return 1
+	var roll := rng.randf() * 100.0
+	var acc := 0.0
+	for entry in rates:
+		acc += float(entry[1])
+		if roll < acc:
+			return int(entry[0])
+	return int(rates[rates.size() - 1][0])
+
+
+func tier_name(tier: int) -> String:
+	match tier:
+		2:
+			return "二阶"
+		3:
+			return "三阶"
+		_:
+			return "一阶"
 
 
 func current_event() -> Dictionary:
@@ -878,6 +942,8 @@ func _do_expand() -> bool:
 
 	nest_level += 1
 	exp_points = 0
+	# 升阶后第一次招募保底：至少 1 个新阶级单位（Q-103）。L3 → 二阶，L4 → 三阶。
+	recruit_pity_tier = nest_level - 1
 	var before_count := cells.size()
 	_rebuild_cells()
 	_add_log("巢穴扩建：Lv.%d，消耗 %d 食物，新增 %d 格（肥沃格累计 %d，其中可用 %d）。" % [

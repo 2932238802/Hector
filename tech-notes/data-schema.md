@@ -36,6 +36,8 @@ last-review: 2026-11-09
 | `army.max_size` | int | 军队上限（当前 7） |
 | `army.front` / `army.back` | int | 前 / 后排格数（4 / 3，战斗 v2 用） |
 | `recruit.refresh_cost` | int | 刷新一次招募候选的食物成本 |
+| `recruit.candidates` | int | 每次招募生成几个候选（当前 3） |
+| `recruit.tier_rates` | object | 按巢穴等级（`"2"` / `"3"` / `"4"`）的各阶权重，如 `[[1,60],[2,40]]` |
 | `combat.defeat_health` | int | 战斗失败扣的巢穴完整度 |
 | `weather.names` | object | 天气 id → 显示名（`clear` 晴 / `rain` 雨 / `cloudy` 多云） |
 | `weather.weights` | object[] | 按季节索引的天气权重（4 项，对应春 / 夏 / 秋 / 冬） |
@@ -120,17 +122,18 @@ last-review: 2026-11-09
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | string | 兵种 id（当前 8 个一阶共享兵） |
+| `id` | string | 兵种 id（当前 24 个：共享 12 + 廪实专属 12） |
 | `name` | string | 显示名（两字） |
 | `combat` | bool | 是否能出战 |
 | `tag` | string | 定位标签 |
-| `tier` | int | 阶级（1 = L2 池；2 = L3；3 = L4） |
+| `tier` | int | 阶级（1 = L2 池；2 = L3；3 = L4），总和 12 / 8 / 4 |
+| `pool` | string | `shared` / `linshi`（专属虫种） |
 | `supply` | int | 每场战斗消耗的食物 |
 | `hp` / `atk` | float | 战斗属性，允许 1 位小数；**无防御 / 速度** |
 | `ap` | int | 每轮行动点（基础 1） |
 | `row` | string | `front` / `back` |
 | `cost` | object | 招募成本，键只有 `food` |
-| `signature` | string | 签名特性（占位文本，未实现效果） |
+| `signature` | string | 签名特性（显示文本，效果未实现） |
 
 ## 5. `data/enemies.json`
 
@@ -194,12 +197,14 @@ unit = { "name", "hp", "max_hp", "atk", "ap", "max_ap", "shield", "row", "alive"
 战斗 / 招募：
 
 11. 军队数量 ≤ `army.max_size`；招募不会超上限。
-12. 每场战斗只扣一次补给，且只按 `deployed=true` 的单位累计；战斗结束后军队数量不变（士兵返场）。
-13. 战斗失败只扣一次 `defeat_health`，不会把完整度扣成负数。
-14. 招募刷新每轮最多一次。
-15. 目标合法性：某排有存活单位时，另一排不可被选为目标（双方通用）。
-16. 第 6 轮敌方阶段结束仍未分胜负 → `result = "ruling"`，按防守方胜结算且掉落减半。
-17. 单位 HP 不跨场：每场从 `units.json` / `enemies.json` 重建，满血开场。
+12. 候选阶级 ≤ 当前巢穴阶级（L2 = 1、L3 ≤ 2、L4 ≤ 3），成本 ≤ 当前食物；不满足的单位不进池。
+13. 升阶后第一次招募至少 1 个新阶级（且付得起）；保底在该次生成后清 0，刷新不重复触发。
+14. 每场战斗只扣一次补给，且只按 `deployed=true` 的单位累计；战斗结束后军队数量不变（士兵返场）。
+15. 战斗失败只扣一次 `defeat_health`，不会把完整度扣成负数。
+16. 招募刷新每轮最多一次。
+17. 目标合法性：某排有存活单位时，另一排不可被选为目标（双方通用）。
+18. 第 6 轮敌方阶段结束仍未分胜负 → `result = "ruling"`，按防守方胜结算且掉落减半。
+19. 单位 HP 不跨场：每场从 `units.json` / `enemies.json` 重建，满血开场。
 
 ## 7. 校验与演进
 

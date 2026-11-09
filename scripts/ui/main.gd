@@ -31,19 +31,28 @@ func _ready() -> void:
 	_maybe_capture()
 
 
-## 开发用：-- --demo-deploy / --demo-battle 直接进入布阵 / 战斗，便于截图与手测。
+## 开发用：-- --demo-deploy / --demo-battle / --demo-recruit 直接进入布阵 / 战斗 / 招募。
 func _maybe_demo() -> void:
 	var args := OS.get_cmdline_user_args()
-	if not ("--demo-deploy" in args or "--demo-battle" in args):
+	if not ("--demo-deploy" in args or "--demo-battle" in args or "--demo-recruit" in args):
 		return
+	var is_recruit := "--demo-recruit" in args
+	var demo_event := {
+		"id": "demo_battle" if not is_recruit else "demo_recruit",
+		"category": "self" if is_recruit else "enemy",
+		"pressure": not is_recruit,
+		"title": "育婴室" if is_recruit else "演示战",
+		"text": "开发用演示。",
+		"effects": {"food": 5} if not is_recruit else {},
+	}
+	if is_recruit:
+		demo_event["recruit"] = true
+	else:
+		demo_event["battle"] = "strong"
 	game.active_group = {
-		"events": [{
-			"id": "demo_battle", "category": "enemy", "pressure": true,
-			"title": "演示战", "text": "开发用战斗演示。",
-			"battle": "strong", "effects": {"food": 5},
-		}],
-		"categories": ["enemy"],
-		"pressure": 1,
+		"events": [demo_event],
+		"categories": ["self" if is_recruit else "enemy"],
+		"pressure": 0 if is_recruit else 1,
 	}
 	game.event_index = 0
 	game.phase = GameStateScript.Phase.EVENT
@@ -558,24 +567,27 @@ func _build_battle() -> void:
 
 func _build_recruit() -> void:
 	side_box.add_child(_title("招募（3 选 1）"))
-	side_box.add_child(_hint("军队 %d/%d · 食物是主要成本；可刷新一次。" % [
+	side_box.add_child(_hint("军队 %d/%d · 候选按巢穴阶级抽取；可刷新一次。" % [
 		game.army.size(), int(game.balance["army"]["max_size"])
 	]))
+	if game.recruit_pity_tier > 1:
+		side_box.add_child(_hint("升阶保底：本次必出%s单位。" % game.tier_name(game.recruit_pity_tier)))
 
 	for unit_id in game.recruit_candidates:
 		var data: Dictionary = game.unit_info(unit_id)
 		var button := Button.new()
-		button.text = "%s — %s" % [
-			str(data.get("name", unit_id)), _cost_text(data.get("cost", {}))
+		button.text = "%s%s — %s" % [
+			game.tier_name(int(data.get("tier", 1))), str(data.get("name", unit_id)),
+			_cost_text(data.get("cost", {}))
 		]
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.custom_minimum_size = Vector2(0, 44)
 		button.disabled = not game.can_recruit(unit_id)
 		button.pressed.connect(_on_recruit.bind(unit_id))
 		side_box.add_child(button)
-		side_box.add_child(_hint("%s · 生命 %.1f / 攻击 %.1f / 补给 %d" % [
+		side_box.add_child(_hint("%s · 生命 %.1f / 攻击 %.1f / 补给 %d · %s" % [
 			str(data.get("tag", "")), float(data.get("hp", 0.0)), float(data.get("atk", 0.0)),
-			int(data.get("supply", 0))
+			int(data.get("supply", 0)), str(data.get("signature", ""))
 		]))
 
 	var refresh_cost := int(game.balance["recruit"]["refresh_cost"])

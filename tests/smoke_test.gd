@@ -23,6 +23,8 @@ func _initialize() -> void:
 	_test_final_ruling()
 	_test_battle_defeat()
 	_test_recruit()
+	_test_recruit_tiers()
+	_test_unit_pool()
 	_test_full_run()
 
 	if failures == 0:
@@ -320,6 +322,10 @@ func _test_recruit() -> void:
 	game.ready_up()
 	check(game.phase == GameStateScript.Phase.RECRUIT, "recruit event enters RECRUIT phase")
 	check(game.recruit_candidates.size() == 3, "3 recruit candidates")
+	for unit_id in game.recruit_candidates:
+		var data: Dictionary = game.unit_info(unit_id)
+		check(int(data.get("tier", 1)) == 1, "L2 recruits are tier 1: " + unit_id)
+		check(int(data.get("cost", {}).get("food", 99)) <= 15, "candidates are affordable: " + unit_id)
 
 	var food_before := int(game.resources["food"])
 	check(game.refresh_recruit(), "first refresh works")
@@ -342,6 +348,73 @@ func _test_recruit() -> void:
 		check(game.army.size() == army_before + 1, "army grows by 1")
 		check(game.phase == GameStateScript.Phase.EVENT, "recruit returns to EVENT")
 		check(game.event_index == 1, "recruit advances the event")
+
+
+func _test_recruit_tiers() -> void:
+	# 升 L3 后的第一次招募必出二阶。
+	var game = GameStateScript.new(778)
+	game.resources["food"] = 60
+	check(game.choose_action("expand"), "expand to L3")
+	check(game.nest_level == 3, "nest is L3")
+	check(game.recruit_pity_tier == 2, "upgrade to L3 sets pity tier 2")
+	_force_single_event(game, {
+		"id": "test_recruit_l3", "category": "self", "pressure": false,
+		"title": "育婴室", "text": "", "recruit": true, "effects": {},
+	})
+	game.ready_up()
+	var has_tier2 := false
+	for unit_id in game.recruit_candidates:
+		if int(game.unit_info(unit_id).get("tier", 1)) == 2:
+			has_tier2 = true
+	check(has_tier2, "L3 pity guarantees a tier-2 candidate")
+	check(game.recruit_pity_tier == 0, "pity is consumed after the roll")
+
+	# 升 L4 后的第一次招募必出三阶。
+	var game4 = GameStateScript.new(779)
+	game4.resources["food"] = 80
+	game4.nest_level = 3
+	game4.exp_points = 0
+	check(game4.choose_action("expand"), "expand to L4")
+	check(game4.nest_level == 4, "nest is L4")
+	check(game4.recruit_pity_tier == 3, "upgrade to L4 sets pity tier 3")
+	_force_single_event(game4, {
+		"id": "test_recruit_l4", "category": "self", "pressure": false,
+		"title": "育婴室", "text": "", "recruit": true, "effects": {},
+	})
+	game4.ready_up()
+	var has_tier3 := false
+	for unit_id in game4.recruit_candidates:
+		if int(game4.unit_info(unit_id).get("tier", 1)) == 3:
+			has_tier3 = true
+	check(has_tier3, "L4 pity guarantees a tier-3 candidate")
+
+	# 食物不足时，只出付得起的候选。
+	var poor = GameStateScript.new(780)
+	poor.resources["food"] = 5
+	_force_single_event(poor, {
+		"id": "test_recruit_poor", "category": "self", "pressure": false,
+		"title": "育婴室", "text": "", "recruit": true, "effects": {},
+	})
+	poor.ready_up()
+	for unit_id in poor.recruit_candidates:
+		check(int(poor.unit_info(unit_id).get("cost", {}).get("food", 99)) <= 5,
+			"only affordable candidates when food is low: " + unit_id)
+
+
+func _test_unit_pool() -> void:
+	var game = GameStateScript.new(781)
+	var counts := {1: 0, 2: 0, 3: 0}
+	for unit in game.units_data.get("units", []):
+		if not bool(unit.get("combat", false)):
+			continue
+		var tier := int(unit.get("tier", 1))
+		counts[tier] += 1
+		check(int(unit.get("ap", 0)) == 1, "base AP is 1: " + str(unit["id"]))
+		check(not unit.has("def"), "no defense stat: " + str(unit["id"]))
+	check(counts[1] == 12, "tier 1 has 12 units (8 shared + 4 exclusive)")
+	check(counts[2] == 8, "tier 2 has 8 units (3 shared + 5 exclusive)")
+	check(counts[3] == 4, "tier 3 has 4 units (1 shared + 3 exclusive)")
+	check(game.unit_info("tunzu").get("name", "") == "囤卒", "exclusive unit is present")
 
 
 func _test_full_run() -> void:

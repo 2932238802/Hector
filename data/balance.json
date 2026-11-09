@@ -43,7 +43,13 @@
     "back": 3
   },
   "recruit": {
-    "refresh_cost": 3
+    "refresh_cost": 3,
+    "candidates": 3,
+    "tier_rates": {
+      "2": [[1, 100]],
+      "3": [[1, 60], [2, 40]],
+      "4": [[1, 45], [2, 35], [3, 20]]
+    }
   },
   "combat": {
     "defeat_health": 10
