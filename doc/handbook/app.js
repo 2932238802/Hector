@@ -40,12 +40,26 @@
   };
 
   // ── 兵种 ──────────────────────────────
+  var TIER_NAME = { 1: "一阶", 2: "二阶", 3: "三阶" };
+
+  // 来源分类：共享 + 各虫种的专属池（从数据里归纳，新增虫种自动出现）
+  function sourceList() {
+    var seen = [];
+    D.units.forEach(function (u) {
+      if (seen.indexOf(u.source) === -1) seen.push(u.source);
+    });
+    return seen.sort(function (a, b) {
+      return (a === "共享" ? -1 : 0) - (b === "共享" ? -1 : 0);
+    });
+  }
+
   function renderUnits() {
     var cards = D.units.map(function (u) {
       return (
         '<article class="card" data-search="' +
-        esc(searchKey([u.name, u.source, u.row, u.sig, u.text, u.note, "兵种 一阶"])) +
-        '">' +
+        esc(searchKey([u.name, u.source, u.row, u.sig, u.text, u.note,
+          "兵种", TIER_NAME[u.tier], "L" + u.tier])) +
+        '" data-tier="' + u.tier + '" data-src="' + esc(u.source) + '">' +
           '<div class="card-head">' +
             "<h3>" + esc(u.name) + "</h3>" +
             '<span class="spacer"></span>' +
@@ -54,11 +68,10 @@
           '<div class="subline">' +
             '<span class="chip">' + esc(u.source) + "</span>" +
             rowChip(u.row) +
-            "<span>一阶</span>" +
+            '<span class="chip tier">' + TIER_NAME[u.tier] + "</span>" +
           "</div>" +
           '<dl class="stats">' +
             "<div><dt>成本</dt><dd>" + num(u.cost) + "<small>食</small></dd></div>" +
-            "<div><dt>补给</dt><dd>" + num(u.supply) + "</dd></div>" +
             "<div><dt>生命</dt><dd>" + num1(u.hp) + "</dd></div>" +
             "<div><dt>攻击</dt><dd>" + num1(u.atk) + "</dd></div>" +
           "</dl>" +
@@ -71,18 +84,48 @@
 
     var ok = D.units.filter(function (u) { return u.status === "已定"; }).length;
     var wip = D.units.length - ok;
+    var tierN = function (t) {
+      return D.units.filter(function (u) { return u.tier === t; }).length;
+    };
+
+    function tierChips() {
+      return [1, 2, 3].map(function (t) {
+        return '<button class="filter-chip" type="button" data-f="tier" data-v="' + t +
+          '" aria-pressed="false"><span class="box"></span>L' + t + " " + TIER_NAME[t] +
+          '<span class="fc">' + tierN(t) + "</span></button>";
+      }).join("");
+    }
+
+    function kindChips() {
+      return sourceList().map(function (src) {
+        var n = D.units.filter(function (u) { return u.source === src; }).length;
+        var label = src === "共享" ? "共享" : src.replace(/专属$/, "");
+        return '<button class="filter-chip" type="button" data-f="src" data-v="' + esc(src) +
+          '" aria-pressed="false"><span class="box"></span>' + esc(label) +
+          '<span class="fc">' + n + "</span></button>";
+      }).join("");
+    }
 
     return (
       '<section class="sec" id="units" data-sec>' +
         '<div class="sec-head">' +
           "<h2>兵种</h2>" +
-          "<p>一阶 12 个：共享 8 + 廪实专属 4。二 / 三阶未设计。战斗内所有单位基础 1 行动点，战后 HP 回满。</p>" +
+          "<p>每虫种 24 个 = 共享 12 + 专属 12。春季切片先做一阶；一阶 12 个（共享 8 + 廪实专属 4）已全部出条目，二阶 / 三阶多为提案。战斗内所有单位基础 1 行动点，战后 HP 回满。</p>" +
           '<div class="counts">' +
             '<span class="count-pill">共 <b>' + D.units.length + "</b> 个</span>" +
             '<span class="count-pill">已定 <b>' + ok + "</b></span>" +
             '<span class="count-pill">提案 <b>' + wip + "</b></span>" +
+            '<span class="count-pill">一阶 <b>' + tierN(1) + "</b> / 二阶 <b>" + tierN(2) +
+              "</b> / 三阶 <b>" + tierN(3) + "</b></span>" +
           "</div>" +
         "</div>" +
+        '<div class="filters" id="unit-filters">' +
+          '<div class="filter-group"><span class="filter-label">阶级</span>' + tierChips() + "</div>" +
+          '<div class="filter-group"><span class="filter-label">来源</span>' + kindChips() + "</div>" +
+          '<button class="filter-clear" id="filter-clear" type="button">清除筛选</button>' +
+          '<span class="filter-count" id="filter-count"></span>' +
+        "</div>" +
+        '<p class="filter-note">L1 / L2 / L3 = 手册里的阶级编号，与巢穴 <b>L1 / L2 / L3</b> 解锁层一一对应。来源按虫种区分；当前专属池只有 <b>廪实</b>。</p>' +
         '<div class="grid units">' + cards + "</div>" +
       "</section>"
     );
@@ -276,7 +319,7 @@
       '<section class="sec" id="events" data-sec>' +
         '<div class="sec-head">' +
           "<h2>事件</h2>" +
-          "<p>春季最小可玩集 13 个。每回合 3 组，每组 A→B→C→D 四个事件。除敌对 / 遗迹外，以下条目均为提案。</p>" +
+          "<p>春季最小可玩集 12 个（原「迷路工蚁」已随工蚁系统删除，待补位，Q-124）。每回合 3 组，每组 A→B→C→D 四个事件。除敌对 / 遗迹外，以下条目均为提案。</p>" +
           '<div class="counts"><span class="count-pill">共 <b>' + D.events.length + "</b> 个</span>" +
             '<span class="count-pill">全部为 <b>提案</b></span></div>' +
         "</div>" +
@@ -413,9 +456,47 @@
   var maxOnPage = {}; // 每页可显示条目数，搜索时用于判断空页
 
   // ── 翻页 ──────────────────────────────
-  function idFromHash() {
-    var id = window.location.hash.slice(1);
-    return PAGE_IDS.indexOf(id) === -1 ? PAGE_IDS[0] : id;
+  // 位置状态写进 hash：#units?q=锐士&tier=1,2&src=共享
+  // 刷新 / 复制链接 / 前进后退都能还原页面、搜索与筛选
+  function readState() {
+    var raw = window.location.hash.slice(1);
+    var st = { id: PAGE_IDS[0], q: "", tier: [], src: [] };
+    if (!raw) return st;
+    var parts = raw.split("?");
+    if (PAGE_IDS.indexOf(parts[0]) !== -1) st.id = parts[0];
+    if (!parts[1]) return st;
+    parts[1].split("&").forEach(function (kv) {
+      var i = kv.indexOf("=");
+      if (i < 0) return;
+      var k = kv.slice(0, i);
+      var v = decodeURIComponent(kv.slice(i + 1));
+      if (k === "q") st.q = v;
+      else if (k === "tier") st.tier = v ? v.split(",").filter(Boolean) : [];
+      else if (k === "src") st.src = v ? v.split(",").filter(Boolean) : [];
+    });
+    return st;
+  }
+
+  function stateHash(id) {
+    var parts = [];
+    var q = search.value.trim();
+    if (q) parts.push("q=" + encodeURIComponent(q));
+    if (filterState.tier.length) parts.push("tier=" + filterState.tier.join(","));
+    if (filterState.src.length) {
+      parts.push("src=" + filterState.src.map(encodeURIComponent).join(","));
+    }
+    return "#" + id + (parts.length ? "?" + parts.join("&") : "");
+  }
+
+  function syncUrl() {
+    var h = stateHash(currentId);
+    if (window.location.hash === h) return;
+    try {
+      window.history.replaceState(null, "", h);
+    } catch (e) {
+      // file:// 下个别浏览器禁用 history API，退回直接改 hash
+      window.location.hash = h.slice(1);
+    }
   }
 
   function pageCount(id) {
@@ -423,9 +504,20 @@
     return sec ? sec.querySelectorAll("[data-search]:not(.hidden)").length : 0;
   }
 
+  var SCROLL_KEY = "hector-handbook-scroll";
+  var scrollMem = {};
+  try { scrollMem = JSON.parse(sessionStorage.getItem(SCROLL_KEY)) || {}; } catch (e) { scrollMem = {}; }
+
+  function saveScroll() {
+    if (!currentId) return;
+    scrollMem[currentId] = window.scrollY;
+    try { sessionStorage.setItem(SCROLL_KEY, JSON.stringify(scrollMem)); } catch (e) {}
+  }
+
   function showPage(id, opts) {
     opts = opts || {};
     if (PAGE_IDS.indexOf(id) === -1) id = PAGE_IDS[0];
+    if (currentId !== id) saveScroll();
     currentId = id;
     var idx = PAGE_IDS.indexOf(id);
 
@@ -443,8 +535,14 @@
     nextBtn.disabled = idx === PAGE_IDS.length - 1;
     statusEl.textContent = (idx + 1) + " / " + PAGE_IDS.length;
 
-    if (opts.scroll !== false) window.scrollTo(0, 0);
-    if (opts.push) window.history.pushState(null, "", "#" + id);
+    if (opts.scroll !== false) window.scrollTo(0, scrollMem[id] || 0);
+    if (opts.push) {
+      try {
+        window.history.pushState(null, "", stateHash(id));
+      } catch (e) {
+        window.location.hash = stateHash(id).slice(1);
+      }
+    }
   }
 
   function go(step) {
@@ -470,8 +568,10 @@
   });
 
   window.addEventListener("popstate", function () {
-    showPage(idFromHash(), { scroll: false });
+    applyStateFromUrl();
   });
+
+  window.addEventListener("pagehide", saveScroll);
 
   document.addEventListener("keydown", function (e) {
     var tag = (e.target && e.target.tagName) || "";
@@ -480,23 +580,52 @@
     else if (e.key === "ArrowRight") { go(1); }
   });
 
-  // ── 搜索 ──────────────────────────────
-  function refreshCounts() {
-    var q = search.value.trim().toLowerCase();
+  // ── 搜索 + 筛选 ────────────────────────
+  var filterState = { tier: [], src: [] };
+  var filterChips = Array.prototype.slice.call(document.querySelectorAll(".filter-chip"));
+  var clearBtn = document.getElementById("filter-clear");
+  var filterCount = document.getElementById("filter-count");
+  var unitCards = Array.prototype.slice.call(document.querySelectorAll("[data-tier]"));
+
+  function filtersActive() {
+    return filterState.tier.length > 0 || filterState.src.length > 0;
+  }
+
+  function unitVisible(el) {
+    var t = el.getAttribute("data-tier");
+    var src = el.getAttribute("data-src");
+    if (filterState.tier.length && filterState.tier.indexOf(t) === -1) return false;
+    if (filterState.src.length && filterState.src.indexOf(src) === -1) return false;
+    return true;
+  }
+
+  function syncChips() {
+    filterChips.forEach(function (b) {
+      var f = b.getAttribute("data-f");
+      var on = filterState[f].indexOf(b.getAttribute("data-v")) !== -1;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
+  function refreshCounts(active) {
     var total = 0;
 
     PAGES.forEach(function (p) {
-      var n = q ? pageCount(p.id) : p.count;
-      if (q) total += n;
+      var n = active ? pageCount(p.id) : p.count;
+      if (active) total += n;
       var a = tabEls.filter(function (el) { return el.getAttribute("data-id") === p.id; })[0];
       if (a) {
         a.querySelector(".n").textContent = n;
-        a.classList.toggle("zero", !!q && n === 0);
+        a.classList.toggle("zero", !!active && n === 0);
       }
     });
 
-    if (q && total === 0) {
-      emptyEl.textContent = "没有匹配「" + search.value.trim() + "」的条目";
+    if (active && total === 0) {
+      var q = search.value.trim();
+      emptyEl.textContent = q
+        ? "没有匹配「" + q + "」的条目"
+        : "当前筛选没有可显示的条目";
       emptyEl.classList.remove("hidden");
     } else {
       emptyEl.classList.add("hidden");
@@ -505,26 +634,98 @@
     return total;
   }
 
-  search.addEventListener("input", function () {
+  function applyAll() {
     var q = search.value.trim().toLowerCase();
+    var shownUnits = 0;
 
     items.forEach(function (el) {
-      el.classList.toggle("hidden", !!q && el.getAttribute("data-search").indexOf(q) === -1);
+      var hide = false;
+      if (el.hasAttribute("data-tier") && !unitVisible(el)) hide = true;
+      if (q && el.getAttribute("data-search").indexOf(q) === -1) hide = true;
+      el.classList.toggle("hidden", hide);
+      if (el.hasAttribute("data-tier") && !hide) shownUnits++;
     });
 
     groups.forEach(function (g) {
       g.classList.toggle("hidden", !g.querySelector("[data-search]:not(.hidden)"));
     });
 
-    var total = refreshCounts();
+    var active = !!q || filtersActive();
+    var total = refreshCounts(active);
+
+    if (filterCount) {
+      filterCount.textContent = "显示 " + shownUnits + " / " + unitCards.length;
+      filterCount.classList.toggle("on", filtersActive());
+    }
 
     // 当前页没有命中时，自动跳到第一个有命中的页
-    if (q && total > 0 && pageCount(currentId) === 0) {
+    if (active && total > 0 && pageCount(currentId) === 0) {
       var first = PAGES.filter(function (p) { return pageCount(p.id) > 0; })[0];
       if (first) showPage(first.id, { push: false });
     }
+
+    syncUrl();
+  }
+
+  // 从 URL 还原完整界面状态（页面 + 搜索 + 筛选）
+  function applyStateFromUrl() {
+    var st = readState();
+    search.value = st.q;
+    filterState.tier = st.tier;
+    filterState.src = st.src;
+    syncChips();
+    showPage(st.id, { scroll: false });
+    applyAll();
+    window.scrollTo(0, scrollMem[currentId] || 0);
+  }
+
+  filterChips.forEach(function (b) {
+    b.addEventListener("click", function () {
+      var f = b.getAttribute("data-f");
+      var v = b.getAttribute("data-v");
+      var i = filterState[f].indexOf(v);
+      if (i === -1) filterState[f].push(v);
+      else filterState[f].splice(i, 1);
+      syncChips();
+      applyAll();
+    });
   });
 
-  // ── 启动：默认第 1 页（兵种）──────────
-  showPage(idFromHash(), { scroll: false });
+  if (clearBtn) {
+    clearBtn.addEventListener("click", function () {
+      filterState.tier = [];
+      filterState.src = [];
+      syncChips();
+      applyAll();
+    });
+  }
+
+  search.addEventListener("input", applyAll);
+  search.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (search.value) {
+      search.value = "";
+      applyAll();
+    }
+    search.blur();
+  });
+
+  // 快捷搜索：/ 或 Ctrl/Cmd+K
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      var tag = (e.target && e.target.tagName) || "";
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      e.preventDefault();
+      search.focus();
+      search.select();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      search.focus();
+      search.select();
+    }
+  });
+
+  // ── 启动：还原 hash 里的页面 / 搜索 / 筛选 ──
+  applyStateFromUrl();
 })();

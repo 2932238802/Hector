@@ -15,7 +15,7 @@ last-review: 2026-11-09
 - 编码 UTF-8，无 BOM；缩进 2 空格。
 - 每个文件顶层必须含 `"schema_version": 1`。
 - `id`：小写 ASCII + 下划线，稳定不变；**改中文名不改 id**。
-- 数值：HP / 攻击最多 1 位小数；成本 / 补给 / 概率按字段说明。
+- 数值：HP / 攻击最多 1 位小数；成本 / 概率按字段说明。
 - 枚举值必须使用下表中文原值，大小写与空格都不得变。
 - 所有字段**必填**，除非标注「可空」。
 
@@ -51,7 +51,6 @@ last-review: 2026-11-09
 | `species_id` | string \| null | `source=species` 时必填，如 `linshi` |
 | `role` | string | 自由文本，如 `前排主力` |
 | `cost_food` | number | ≥ 0 |
-| `supply` | number | 每场战斗补给，≥ 0 |
 | `hp` | number | > 0，1 位小数 |
 | `attack` | number | ≥ 0，1 位小数 |
 | `ap` | int | ≥ 1，默认 1 |
@@ -117,7 +116,6 @@ last-review: 2026-11-09
 |---|---|---|
 | `food_delta` | number | 正负均可 |
 | `integrity_delta` | number | 巢穴完整度 |
-| `workers_delta` | int | 工蚁 |
 | `gain_seed` | string \| null | 种子 id |
 | `gain_result` | string \| null | 战果 id |
 | `gain_relic` | string \| null | 虫珀 id |
@@ -134,7 +132,7 @@ last-review: 2026-11-09
 | `spring` | `production_bonus` / `enemy_scale` / `explore_worker_loss` | `1` / `1.1` / `1` |
 | `weather.clear` | `production_bonus` | `1` |
 | `weather.cloudy` | — | 无修正 |
-| `weather.rain` | `supply_multiplier` / `explore_worker_loss` | `1.5` / `1` |
+| `weather.rain` | `explore_worker_loss` | `1` |
 | `combat` | `target_rounds` / `verdict_round` | `[3,4]` / `6` |
 | `rewards.normal` | `food_min` / `food_max` / `result_chance` | `2` / `4` / `0.5` |
 | `rewards.elite` | `food_min` / `food_max` / `relic_chance` | `4` / `6` / `0.5` |
@@ -163,7 +161,7 @@ last-review: 2026-11-09
 
 1. 所有 `id` 在文件内唯一；跨文件引用必须存在（事件的 `battle.enemy_id`、`gain_relic` 等）。
 2. `tier` 只能是 1–3；本期数据只允许 1。
-3. `hp > 0`、`attack ≥ 0`、`cost_food ≥ 0`、`supply ≥ 0`、`ap ≥ 1`。
+3. `hp > 0`、`attack ≥ 0`、`cost_food ≥ 0`、`ap ≥ 1`。
 4. `row` / `keywords` / `category` / `status` 只能取枚举值。
 5. 模板 `slots` 必须 4 项，且至少 1 项敌对。
 6. 权重 0–100；同一模板四季权重不必合计 100。
