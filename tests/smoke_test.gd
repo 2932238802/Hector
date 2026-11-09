@@ -19,6 +19,8 @@ func _initialize() -> void:
 	_test_determinism()
 	_test_weather()
 	_test_battle()
+	_test_target_rules()
+	_test_final_ruling()
 	_test_battle_defeat()
 	_test_recruit()
 	_test_full_run()
@@ -182,9 +184,12 @@ func _test_weather() -> void:
 		"id": "weather_battle", "category": "enemy", "pressure": true,
 		"title": "雨天敌袭", "text": "", "battle": "weak", "effects": {},
 	})
-	var food_before := int(battle_game.resources["food"])
 	battle_game.ready_up()
-	check(int(battle_game.resources["food"]) == food_before - 5, "rain raises battle supply 3 -> 5")
+	check(battle_game.phase == GameStateScript.Phase.DEPLOY, "rain battle enters DEPLOY")
+	check(battle_game.deploy_supply() == 5, "rain raises battle supply 3 -> 5")
+	var food_before := int(battle_game.resources["food"])
+	check(battle_game.start_battle(), "rain battle starts")
+	check(int(battle_game.resources["food"]) == food_before - 5, "rain supply is paid (5 food)")
 
 	# 雨天：冒险工蚁消耗 +1，完整度 -3（基础 -2 + 雨天 -1）
 	var adventure_game = GameStateScript.new(11)
@@ -217,10 +222,22 @@ func _test_battle() -> void:
 	})
 	var food_before := int(game.resources["food"])
 	game.weather = "clear"
-	check(game.ready_up(), "ready_up starts a battle")
+	check(game.ready_up(), "ready_up opens deployment")
+	check(game.phase == GameStateScript.Phase.DEPLOY, "enters DEPLOY phase")
+	check(game.deploy_units.size() == 3, "all 3 units listed for deployment")
+	check(game.deployed_count() == 3, "all units deployed by default")
+	check(game.deploy_supply() == 3, "deploy supply = 3")
+	check(game.can_start_battle(), "can start with 15 food")
+
+	check(game.deploy_set("caiwei", ""), "can bench a unit")
+	check(game.deploy_supply() == 2, "benching drops supply to 2")
+	check(game.deploy_set("caiwei", "back"), "can redeploy the unit")
+	check(game.deploy_supply() == 3, "redeploy restores supply to 3")
+	check(game.start_battle(), "battle starts")
 	check(game.phase == GameStateScript.Phase.BATTLE, "enters BATTLE phase")
-	check(game.battle["enemies"].size() == 2, "weak tier has 2 enemies")
-	check(int(game.resources["food"]) == food_before - 3, "battle consumes supply (3 food)")
+	check(int(game.resources["food"]) == food_before - 3, "supply paid per deployed unit (3 food)")
+	check(game.battle["enemies"]["front"].size() == 2, "weak tier front = 2")
+	check(game.battle["enemies"]["back"].size() == 0, "weak tier back = 0")
 
 	_auto_battle(game)
 
@@ -229,6 +246,51 @@ func _test_battle() -> void:
 	check(game.army.size() == 3, "units return after battle (army unchanged)")
 	check(int(game.resources["food"]) == food_before - 3 + 3, "victory applies loot (3 food)")
 	check(game.health > 0.0, "victory does not damage the nest")
+
+
+func _test_target_rules() -> void:
+	var game = GameStateScript.new(557)
+	_force_single_event(game, {
+		"id": "test_targets", "category": "enemy", "pressure": true,
+		"title": "前后排测试", "text": "", "battle": "strong", "effects": {"food": 5},
+	})
+	game.ready_up()
+	game.start_battle()
+	check(game.phase == GameStateScript.Phase.BATTLE, "strong battle starts")
+	check(game.battle["enemies"]["front"].size() == 3, "strong tier front = 3")
+	check(game.battle["enemies"]["back"].size() == 1, "strong tier back = 1")
+	check(game.enemies_front_alive(), "enemy front is alive")
+	check(not game.player_attack("back", 0), "cannot attack back row while front alive")
+	check(game.player_has_ap(), "rejected attack does not consume AP")
+	check(game.player_attack("front", 0), "can attack front row")
+	check(int(game.battle["player"]["front"][0]["ap"]) == 0, "attack consumes the unit's 1 AP")
+
+
+func _test_final_ruling() -> void:
+	var game = GameStateScript.new(558)
+	_force_single_event(game, {
+		"id": "test_ruling", "category": "enemy", "pressure": true,
+		"title": "僵局", "text": "", "battle": "strong", "effects": {"food": 5},
+	})
+	game.ready_up()
+	game.start_battle()
+	var food_after_supply := int(game.resources["food"])
+	for row in ["front", "back"]:
+		for unit in game.battle["player"][row]:
+			unit["atk"] = 0.0
+			unit["hp"] = 999.0
+			unit["max_hp"] = 999.0
+		for enemy in game.battle["enemies"][row]:
+			enemy["atk"] = 0.0
+			enemy["hp"] = 999.0
+			enemy["max_hp"] = 999.0
+
+	for i in 6:
+		game.end_player_phase()
+
+	check(game.phase != GameStateScript.Phase.BATTLE, "6-round stalemate triggers final ruling")
+	check(game.phase == GameStateScript.Phase.EVENT, "ruling advances the event")
+	check(int(game.resources["food"]) == food_after_supply + 2, "ruling gives reduced loot (5 -> 2)")
 
 
 func _test_battle_defeat() -> void:
@@ -241,6 +303,7 @@ func _test_battle_defeat() -> void:
 	})
 	var health_before: float = game.health
 	game.ready_up()
+	game.start_battle()
 	_auto_battle(game)
 
 	check(game.phase != GameStateScript.Phase.BATTLE, "defeat ends the battle")
@@ -300,6 +363,11 @@ func _test_full_run() -> void:
 				game.choose_group(0)
 			GameStateScript.Phase.EVENT:
 				game.ready_up()
+			GameStateScript.Phase.DEPLOY:
+				if game.can_start_battle():
+					game.start_battle()
+				else:
+					game.avoid_battle()
 			GameStateScript.Phase.BATTLE:
 				_auto_battle(game)
 			GameStateScript.Phase.RECRUIT:
@@ -338,6 +406,11 @@ func _play_until_turn_end(game) -> void:
 		guard += 1
 		if game.phase == GameStateScript.Phase.EVENT:
 			game.ready_up()
+		elif game.phase == GameStateScript.Phase.DEPLOY:
+			if game.can_start_battle():
+				game.start_battle()
+			else:
+				game.avoid_battle()
 		elif game.phase == GameStateScript.Phase.BATTLE:
 			_auto_battle(game)
 		elif game.phase == GameStateScript.Phase.RECRUIT:
@@ -351,13 +424,15 @@ func _auto_battle(game) -> void:
 	while game.phase == GameStateScript.Phase.BATTLE and guard < 300:
 		guard += 1
 		if game.player_has_ap():
+			var row := "front" if game.enemies_front_alive() else "back"
+			var list: Array = game.battle["enemies"][row]
 			var target := -1
-			for index in game.battle["enemies"].size():
-				if bool(game.battle["enemies"][index]["alive"]):
+			for index in list.size():
+				if bool(list[index]["alive"]):
 					target = index
 					break
 			if target >= 0:
-				game.player_attack(target)
+				game.player_attack(row, target)
 			else:
 				break
 		else:

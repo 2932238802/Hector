@@ -27,7 +27,29 @@ func _ready() -> void:
 	_build_theme()
 	_build_ui()
 	_start_game(0)
+	_maybe_demo()
 	_maybe_capture()
+
+
+## 开发用：-- --demo-deploy / --demo-battle 直接进入布阵 / 战斗，便于截图与手测。
+func _maybe_demo() -> void:
+	var args := OS.get_cmdline_user_args()
+	if not ("--demo-deploy" in args or "--demo-battle" in args):
+		return
+	game.active_group = {
+		"events": [{
+			"id": "demo_battle", "category": "enemy", "pressure": true,
+			"title": "演示战", "text": "开发用战斗演示。",
+			"battle": "strong", "effects": {"food": 5},
+		}],
+		"categories": ["enemy"],
+		"pressure": 1,
+	}
+	game.event_index = 0
+	game.phase = GameStateScript.Phase.EVENT
+	game.ready_up()
+	if "--demo-battle" in args:
+		game.start_battle()
 
 
 ## 开发用：带着 -- --shot=<绝对路径> 启动时，渲染两帧后截图并退出。
@@ -267,6 +289,8 @@ func _phase_text() -> String:
 			]
 		GameStateScript.Phase.BATTLE:
 			return "战斗 · 第 %d 轮" % int(game.battle.get("round", 1))
+		GameStateScript.Phase.DEPLOY:
+			return "布阵 · 出战 %d" % game.deployed_count()
 		GameStateScript.Phase.RECRUIT:
 			return "招募"
 		GameStateScript.Phase.GAME_OVER:
@@ -288,6 +312,8 @@ func _build_side() -> void:
 			_build_groups()
 		GameStateScript.Phase.EVENT:
 			_build_event()
+		GameStateScript.Phase.DEPLOY:
+			_build_deploy()
 		GameStateScript.Phase.BATTLE:
 			_build_battle()
 		GameStateScript.Phase.RECRUIT:
@@ -403,10 +429,61 @@ func _build_event() -> void:
 		side_box.add_child(_hint("进度 %d/4" % (game.event_index + 1)))
 
 	var button := Button.new()
-	button.text = "迎战" if is_battle else "准备就绪"
+	button.text = "布阵迎战" if is_battle else "准备就绪"
 	button.custom_minimum_size = Vector2(0, 52)
 	button.pressed.connect(_on_ready_up)
 	side_box.add_child(button)
+
+
+func _build_deploy() -> void:
+	side_box.add_child(_title("布阵（前 %d / 后 %d）" % [
+		int(game.balance["army"]["front"]), int(game.balance["army"]["back"])
+	]))
+	side_box.add_child(_hint("开战前按实际出战单位支付补给；食物不够就撤下单位。空位允许。"))
+
+	for entry in game.deploy_units:
+		var box := HBoxContainer.new()
+		var label := Label.new()
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		label.text = "%s · %s · 补给 %d%s" % [
+			str(entry["name"]), "前排" if str(entry["row"]) == "front" else "后排",
+			int(entry["supply"]), "" if bool(entry["deployed"]) else "（后备）"
+		]
+		label.add_theme_font_size_override("font_size", 15)
+		box.add_child(label)
+		for row in ["front", "back"]:
+			var row_button := Button.new()
+			row_button.text = "前" if row == "front" else "后"
+			row_button.custom_minimum_size = Vector2(44, 34)
+			row_button.disabled = bool(entry["deployed"]) and str(entry["row"]) == row
+			row_button.pressed.connect(_on_deploy.bind(str(entry["unit_id"]), row))
+			box.add_child(row_button)
+		var out_button := Button.new()
+		out_button.text = "撤"
+		out_button.custom_minimum_size = Vector2(44, 34)
+		out_button.disabled = not bool(entry["deployed"])
+		out_button.pressed.connect(_on_deploy.bind(str(entry["unit_id"]), ""))
+		box.add_child(out_button)
+		side_box.add_child(box)
+
+	var supply: int = game.deploy_supply()
+	side_box.add_child(_hint("出战 %d 个 · 补给 %d 食物（现有 %d）%s" % [
+		game.deployed_count(), supply, int(game.resources["food"]),
+		"" if int(game.resources["food"]) >= supply else " · 食物不足"
+	]))
+
+	var start_button := Button.new()
+	start_button.text = "开战（补给 -%d 食物）" % supply
+	start_button.custom_minimum_size = Vector2(0, 50)
+	start_button.disabled = not game.can_start_battle()
+	start_button.pressed.connect(_on_start_battle)
+	side_box.add_child(start_button)
+
+	var avoid_button := Button.new()
+	avoid_button.text = "避战（不结算；谈判 / 回避规则待定）"
+	avoid_button.custom_minimum_size = Vector2(0, 40)
+	avoid_button.pressed.connect(_on_avoid)
+	side_box.add_child(avoid_button)
 
 
 func _build_end() -> void:
@@ -428,44 +505,52 @@ func _build_end() -> void:
 
 func _build_battle() -> void:
 	var battle: Dictionary = game.battle
-	side_box.add_child(_title("战斗 · 第 %d 回合" % int(battle.get("round", 1))))
-	side_box.add_child(_hint("点敌方单位＝攻击（1 AP）。敌方优先打我方前排。"))
+	side_box.add_child(_title("战斗 · 第 %d 轮" % int(battle.get("round", 1))))
+	side_box.add_child(_hint("点敌方单位＝攻击（每单位 1 AP）。前排全灭后才能打后排。"))
 
-	side_box.add_child(_section("敌方"))
-	var enemies: Array = battle.get("enemies", [])
-	for index in enemies.size():
-		var enemy: Dictionary = enemies[index]
-		var button := Button.new()
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.custom_minimum_size = Vector2(0, 40)
-		if bool(enemy["alive"]):
-			button.text = "%s  %.1f/%.1f · %s" % [
-				str(enemy["name"]), float(enemy["hp"]), float(enemy["max_hp"]),
-				"前排" if str(enemy["row"]) == "front" else "后排"
-			]
-			button.pressed.connect(_on_attack.bind(index))
-		else:
-			button.text = "%s（已倒下）" % str(enemy["name"])
-			button.disabled = true
-		side_box.add_child(button)
+	var enemies: Dictionary = battle.get("enemies", {})
+	for row in ["front", "back"]:
+		var list: Array = enemies.get(row, [])
+		side_box.add_child(_section("敌方前排" if row == "front" else "敌方后排"))
+		for index in list.size():
+			var enemy: Dictionary = list[index]
+			var button := Button.new()
+			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			button.custom_minimum_size = Vector2(0, 40)
+			if bool(enemy["alive"]):
+				button.text = "%s  %.1f/%.1f  AP %d" % [
+					str(enemy["name"]), float(enemy["hp"]), float(enemy["max_hp"]),
+					int(enemy["ap"])
+				]
+				if row == "back" and game.enemies_front_alive():
+					button.disabled = true
+				else:
+					button.pressed.connect(_on_attack.bind(row, index))
+			else:
+				button.text = "%s（已退场）" % str(enemy["name"])
+				button.disabled = true
+			side_box.add_child(button)
 
 	side_box.add_child(_section("我方"))
-	var players: Array = battle.get("player", [])
-	for unit in players:
-		var label := Label.new()
-		label.add_theme_font_size_override("font_size", 15)
-		if bool(unit["alive"]):
-			label.text = "%s  %.1f/%.1f  AP %d/%d" % [
-				str(unit["name"]), float(unit["hp"]), float(unit["max_hp"]),
-				int(unit["ap"]), int(unit["max_ap"])
-			]
-		else:
-			label.text = "%s（已退场）" % str(unit["name"])
-			label.add_theme_color_override("font_color", MUTED)
-		side_box.add_child(label)
+	var players: Dictionary = battle.get("player", {})
+	for row in ["front", "back"]:
+		for unit in players.get(row, []):
+			var label := Label.new()
+			label.add_theme_font_size_override("font_size", 15)
+			if bool(unit["alive"]):
+				var shield := float(unit.get("shield", 0.0))
+				label.text = "%s  %.1f/%.1f  AP %d/%d%s" % [
+					str(unit["name"]), float(unit["hp"]), float(unit["max_hp"]),
+					int(unit["ap"]), int(unit["max_ap"]),
+					"  护盾 %.1f" % shield if shield > 0.0 else ""
+				]
+			else:
+				label.text = "%s（已退场）" % str(unit["name"])
+				label.add_theme_color_override("font_color", MUTED)
+			side_box.add_child(label)
 
 	var end_button := Button.new()
-	end_button.text = "结束回合（敌方行动）"
+	end_button.text = "结束玩家阶段（敌方行动）"
 	end_button.custom_minimum_size = Vector2(0, 46)
 	end_button.pressed.connect(_on_end_phase)
 	side_box.add_child(end_button)
@@ -584,6 +669,18 @@ func _on_action(action_id: String) -> void:
 	game.choose_action(action_id)
 
 
+func _on_deploy(unit_id: String, row: String) -> void:
+	game.deploy_set(unit_id, row)
+
+
+func _on_start_battle() -> void:
+	game.start_battle()
+
+
+func _on_avoid() -> void:
+	game.avoid_battle()
+
+
 func _on_plant(seed_id: String) -> void:
 	game.plant_seed(seed_id)
 
@@ -596,8 +693,8 @@ func _on_ready_up() -> void:
 	game.ready_up()
 
 
-func _on_attack(index: int) -> void:
-	game.player_attack(index)
+func _on_attack(row: String, index: int) -> void:
+	game.player_attack(row, index)
 
 
 func _on_end_phase() -> void:

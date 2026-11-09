@@ -153,8 +153,25 @@ last-review: 2026-11-09
 | `tiers.<tier>.units[]` | array | 敌军模板列表 |
 | `units[].name` | string | 敌军单位名 |
 | `units[].hp` / `atk` / `ap` | number | 属性；防御已删除 |
-| `units[].row` | string | `front` / `back` |
+| `units[].row` | string | `front` / `back`；双方前 4 后 3，超出容量的模板忽略 |
 | `units[].count` | int | 该模板生成几个 |
+
+战斗状态（`GameState.battle`，运行时结构，不落盘）：
+
+```text
+{
+  "player":  { "front": [unit...4], "back": [unit...3] },
+  "enemies": { "front": [unit...4], "back": [unit...3] },
+  "round": 1,
+  "supply": 3,          # 本场实际支付的食物
+  "event": {...},       # 战斗胜利后结算 effects
+  "result": "win" | "lose" | "ruling"
+}
+unit = { "name", "hp", "max_hp", "atk", "ap", "max_ap", "shield", "row", "alive" }
+```
+
+布阵阶段另有 `deploy_units`：`[{ "unit_id", "name", "row", "supply", "deployed" }]`；
+`deploy_supply()` 只累计 `deployed=true` 的单位，再乘天气补给倍率。
 
 ## 6. 代码保证的不变量
 
@@ -177,9 +194,12 @@ last-review: 2026-11-09
 战斗 / 招募：
 
 11. 军队数量 ≤ `army.max_size`；招募不会超上限。
-12. 每场战斗只扣一次补给；战斗结束后军队数量不变（士兵返场）。
+12. 每场战斗只扣一次补给，且只按 `deployed=true` 的单位累计；战斗结束后军队数量不变（士兵返场）。
 13. 战斗失败只扣一次 `defeat_health`，不会把完整度扣成负数。
 14. 招募刷新每轮最多一次。
+15. 目标合法性：某排有存活单位时，另一排不可被选为目标（双方通用）。
+16. 第 6 轮敌方阶段结束仍未分胜负 → `result = "ruling"`，按防守方胜结算且掉落减半。
+17. 单位 HP 不跨场：每场从 `units.json` / `enemies.json` 重建，满血开场。
 
 ## 7. 校验与演进
 

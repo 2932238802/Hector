@@ -5,7 +5,7 @@ extends RefCounted
 
 signal changed
 
-enum Phase { ACTION, GROUP_SELECT, EVENT, BATTLE, RECRUIT, GAME_OVER, WON }
+enum Phase { ACTION, GROUP_SELECT, EVENT, DEPLOY, BATTLE, RECRUIT, GAME_OVER, WON }
 
 const EventPoolScript := preload("res://scripts/core/event_pool.gd")
 const HexGridScript := preload("res://scripts/core/hex_grid.gd")
@@ -46,6 +46,8 @@ var cells: Array = []
 var groups: Array = []
 var active_group: Dictionary = {}
 var battle := {}
+var deploy_units: Array = []
+var pending_event: Dictionary = {}
 var recruit_candidates: Array[String] = []
 var recruit_refreshed := false
 var logs: Array[String] = []
@@ -123,6 +125,8 @@ func _begin_turn() -> void:
 	event_index = 0
 	active_group = {}
 	battle = {}
+	deploy_units = []
+	pending_event = {}
 	recruit_candidates = []
 	phase = Phase.ACTION
 	_add_log("第 %d 回合（%s 第 %d/%d 回合，总 %d/%d）· 天气 %s：本回合预计产出 %d 食物，工蚁 +%d，巢穴恢复 +%d。" % [
@@ -180,7 +184,7 @@ func ready_up() -> bool:
 		return false
 
 	if event.has("battle"):
-		_start_battle(event)
+		_open_deploy(event)
 		changed.emit()
 		return true
 
@@ -190,41 +194,235 @@ func ready_up() -> bool:
 
 
 # ---------------------------------------------------------------------------
+# 布阵（开战前）
+# ---------------------------------------------------------------------------
+
+func _open_deploy(event: Dictionary) -> void:
+	pending_event = event
+	deploy_units = []
+	var front_used := 0
+	var back_used := 0
+	for unit_id in army:
+		var data := unit_info(unit_id)
+		if data.is_empty() or not bool(data.get("combat", false)):
+			continue
+		var row := str(data.get("row", "front"))
+		var deployed := true
+		if row == "front":
+			if front_used >= _row_cap("front"):
+				deployed = false
+			else:
+				front_used += 1
+		else:
+			if back_used >= _row_cap("back"):
+				deployed = false
+			else:
+				back_used += 1
+		deploy_units.append({
+			"unit_id": unit_id,
+			"name": str(data.get("name", unit_id)),
+			"row": row,
+			"supply": int(data.get("supply", 1)),
+			"deployed": deployed,
+		})
+	battle = {}
+	phase = Phase.DEPLOY
+	_add_log("布阵：%s 来袭，选择出战单位（前 %d / 后 %d）。" % [
+		battle_tier_name(str(event.get("battle", "weak"))), _row_cap("front"), _row_cap("back")
+	])
+
+
+func _row_cap(row: String) -> int:
+	return int(balance["army"].get(row, 4))
+
+
+func _deploy_entry(unit_id: String) -> Dictionary:
+	for entry in deploy_units:
+		if str(entry["unit_id"]) == unit_id:
+			return entry
+	return {}
+
+
+func deploy_set(unit_id: String, row: String) -> bool:
+	if phase != Phase.DEPLOY:
+		return false
+	var entry := _deploy_entry(unit_id)
+	if entry.is_empty():
+		return false
+	if row == "":
+		entry["deployed"] = false
+		changed.emit()
+		return true
+	if row != "front" and row != "back":
+		return false
+	var used := 0
+	for other in deploy_units:
+		if other == entry:
+			continue
+		if bool(other["deployed"]) and str(other["row"]) == row:
+			used += 1
+	if used >= _row_cap(row):
+		_add_log("该排已满（%d 个）。" % _row_cap(row))
+		changed.emit()
+		return false
+	entry["row"] = row
+	entry["deployed"] = true
+	changed.emit()
+	return true
+
+
+func deployed_count() -> int:
+	var count := 0
+	for entry in deploy_units:
+		if bool(entry["deployed"]):
+			count += 1
+	return count
+
+
+func deploy_supply() -> int:
+	var base := 0
+	for entry in deploy_units:
+		if bool(entry["deployed"]):
+			base += int(entry["supply"])
+	var mult := _weather_effect("supply_mult", 1.0)
+	return int(ceil(float(base) * mult))
+
+
+func can_start_battle() -> bool:
+	return (
+		phase == Phase.DEPLOY
+		and deployed_count() > 0
+		and int(resources["food"]) >= deploy_supply()
+	)
+
+
+func start_battle() -> bool:
+	if phase != Phase.DEPLOY:
+		return false
+	var supply := deploy_supply()
+	if deployed_count() <= 0:
+		_add_log("没有出战单位，无法迎战。")
+		changed.emit()
+		return false
+	if int(resources["food"]) < supply:
+		_add_log("食物不足（补给需要 %d），先撤下单位。" % supply)
+		changed.emit()
+		return false
+
+	resources["food"] = int(resources["food"]) - supply
+	var players_front: Array = []
+	var players_back: Array = []
+	for entry in deploy_units:
+		if not bool(entry["deployed"]):
+			continue
+		var data := unit_info(str(entry["unit_id"]))
+		var unit := _make_unit(
+			str(data.get("name", entry["unit_id"])),
+			float(data.get("hp", 8)),
+			float(data.get("atk", 2)),
+			int(data.get("ap", 1)),
+			str(entry["row"])
+		)
+		unit["unit_id"] = str(entry["unit_id"])
+		if str(entry["row"]) == "front":
+			players_front.append(unit)
+		else:
+			players_back.append(unit)
+
+	var enemies_front: Array = []
+	var enemies_back: Array = []
+	for template in _tier_units(str(pending_event.get("battle", "weak"))):
+		for i in int(template.get("count", 1)):
+			var unit := _make_unit(
+				str(template.get("name", "敌人")),
+				float(template.get("hp", 8)),
+				float(template.get("atk", 2)),
+				int(template.get("ap", 1)),
+				str(template.get("row", "front"))
+			)
+			if str(unit["row"]) == "front" and enemies_front.size() < _row_cap("front"):
+				enemies_front.append(unit)
+			elif enemies_back.size() < _row_cap("back"):
+				unit["row"] = "back"
+				enemies_back.append(unit)
+
+	battle = {
+		"player": {"front": players_front, "back": players_back},
+		"enemies": {"front": enemies_front, "back": enemies_back},
+		"round": 1,
+		"supply": supply,
+		"event": pending_event,
+		"result": "",
+	}
+	phase = Phase.BATTLE
+	_add_log("战斗开始：我方 %d 只，敌方 %d 只，补给 -%d 食物。" % [
+		players_front.size() + players_back.size(),
+		enemies_front.size() + enemies_back.size(), supply
+	])
+	changed.emit()
+	return true
+
+
+func avoid_battle() -> void:
+	if phase != Phase.DEPLOY:
+		return
+	_add_log("避战：谈判 / 回避规则未定（Q-084），原型按不结算处理。")
+	deploy_units = []
+	pending_event = {}
+	_advance_event()
+	changed.emit()
+
+
+func _make_unit(name: String, hp: float, atk: float, ap: int, row: String) -> Dictionary:
+	return {
+		"name": name,
+		"hp": hp,
+		"max_hp": hp,
+		"atk": atk,
+		"ap": ap,
+		"max_ap": ap,
+		"shield": 0.0,
+		"row": row,
+		"alive": true,
+	}
+
+
+func _tier_units(tier: String) -> Array:
+	var tiers: Dictionary = enemies_data.get("tiers", {})
+	var tier_data: Dictionary = tiers.get(tier, tiers.get("weak", {}))
+	return tier_data.get("units", [])
+
+
+# ---------------------------------------------------------------------------
 # 战斗
 # ---------------------------------------------------------------------------
 
-func player_attack(enemy_index: int) -> bool:
+func player_attack(row: String, index: int) -> bool:
 	if phase != Phase.BATTLE:
 		return false
-	var enemies: Array = battle["enemies"]
-	if enemy_index < 0 or enemy_index >= enemies.size():
+	if row != "front" and row != "back":
 		return false
-	var target: Dictionary = enemies[enemy_index]
+	var enemies: Dictionary = battle["enemies"]
+	var targets: Array = enemies[row]
+	if index < 0 or index >= targets.size():
+		return false
+	var target: Dictionary = targets[index]
 	if not bool(target["alive"]):
 		return false
-	if str(target["row"]) == "back" and _row_alive(enemies, "front"):
+	if row == "back" and _side_alive(enemies["front"]):
 		_add_log("敌方前排还在，打不到后排。")
 		changed.emit()
 		return false
 
 	var attacker := _next_ready_player()
 	if attacker.is_empty():
-		_add_log("我方没有剩余行动点，点「结束回合」。")
+		_add_log("我方没有剩余行动点，点「结束玩家阶段」。")
 		changed.emit()
 		return false
 
-	var damage := maxf(0.1, snappedf(float(attacker["atk"]) - float(target["def"]), 0.1))
-	target["hp"] = float(target["hp"]) - damage
+	_attack(attacker, target)
 	attacker["ap"] = int(attacker["ap"]) - 1
-	_add_log("%s 攻击 %s，造成 %d 伤害。" % [
-		str(attacker["name"]), str(target["name"]), damage
-	])
-	if int(target["hp"]) <= 0:
-		target["alive"] = false
-		_add_log("%s 倒下。" % str(target["name"]))
-
-	if not _any_alive(enemies):
-		_finish_battle(true)
+	_check_battle_end()
 	changed.emit()
 	return true
 
@@ -232,37 +430,96 @@ func player_attack(enemy_index: int) -> bool:
 func end_player_phase() -> void:
 	if phase != Phase.BATTLE:
 		return
-	var enemies: Array = battle["enemies"]
-	var players: Array = battle["player"]
+	for row in ["front", "back"]:
+		for enemy in battle["enemies"][row]:
+			while bool(enemy["alive"]) and int(enemy["ap"]) > 0:
+				var target := _pick_player_target()
+				if target.is_empty():
+					break
+				_attack(enemy, target)
+				enemy["ap"] = int(enemy["ap"]) - 1
+				if _check_battle_end():
+					changed.emit()
+					return
+	_add_log("敌方阶段结束。")
 
-	for enemy in enemies:
-		while bool(enemy["alive"]) and int(enemy["ap"]) > 0:
-			var target := _front_target(players)
-			if target.is_empty():
-				break
-			var damage := maxf(0.1, snappedf(float(enemy["atk"]) - float(target["def"]), 0.1))
-			target["hp"] = float(target["hp"]) - damage
-			enemy["ap"] = int(enemy["ap"]) - 1
-			if int(target["hp"]) <= 0:
-				target["alive"] = false
-				_add_log("%s 被打退。" % str(target["name"]))
-			if not _any_alive(players):
-				break
-
-	_add_log("敌方回合结束。")
-
-	if not _any_alive(players):
-		_finish_battle(false)
+	battle["round"] = int(battle["round"]) + 1
+	if int(battle["round"]) > 6:
+		_add_log("第 6 轮结束仍未分胜负，触发最终裁决（防守方胜，掉落减少）。")
+		_finish_battle(true, true)
 		changed.emit()
 		return
 
-	battle["round"] = int(battle["round"]) + 1
-	for unit in players:
-		unit["ap"] = int(unit["max_ap"])
-	for enemy in enemies:
-		if bool(enemy["alive"]):
-			enemy["ap"] = int(enemy["max_ap"])
+	_refill_ap()
 	changed.emit()
+
+
+func _attack(attacker: Dictionary, target: Dictionary) -> float:
+	var variance := rng.randf_range(0.90, 1.10)
+	var damage := maxf(0.1, snappedf(float(attacker["atk"]) * variance, 0.1))
+	var shield := float(target.get("shield", 0.0))
+	if shield > 0.0:
+		var absorbed := minf(shield, damage)
+		target["shield"] = shield - absorbed
+		damage -= absorbed
+		if absorbed > 0.0:
+			_add_log("%s 的护盾吸收 %.1f。" % [str(target["name"]), absorbed])
+	if damage > 0.0:
+		target["hp"] = float(target["hp"]) - damage
+		_add_log("%s 攻击 %s，造成 %.1f 伤害（%s 剩余 %.1f）。" % [
+			str(attacker["name"]), str(target["name"]), damage,
+			str(target["name"]), maxf(0.0, float(target["hp"]))
+		])
+		if float(target["hp"]) <= 0.0 and bool(target["alive"]):
+			target["alive"] = false
+			_add_log("%s 退场。" % str(target["name"]))
+	else:
+		_add_log("%s 攻击 %s，被护盾完全挡下。" % [str(attacker["name"]), str(target["name"])])
+	return damage
+
+
+func _check_battle_end() -> bool:
+	if not _side_alive(battle["enemies"]["front"]) and not _side_alive(battle["enemies"]["back"]):
+		_finish_battle(true)
+		return true
+	if not _side_alive(battle["player"]["front"]) and not _side_alive(battle["player"]["back"]):
+		_finish_battle(false)
+		return true
+	return false
+
+
+func _side_alive(units: Array) -> bool:
+	for unit in units:
+		if bool(unit["alive"]):
+			return true
+	return false
+
+
+func enemies_front_alive() -> bool:
+	return _side_alive(battle.get("enemies", {}).get("front", []))
+
+
+func _pick_player_target() -> Dictionary:
+	var front: Array = battle["player"]["front"]
+	var back: Array = battle["player"]["back"]
+	var pool: Array = front if _side_alive(front) else back
+	var best := {}
+	for unit in pool:
+		if not bool(unit["alive"]):
+			continue
+		if best.is_empty() or float(unit["hp"]) < float(best["hp"]):
+			best = unit
+	return best
+
+
+func _refill_ap() -> void:
+	for row in ["front", "back"]:
+		for unit in battle["player"][row]:
+			if bool(unit["alive"]):
+				unit["ap"] = int(unit["max_ap"])
+		for enemy in battle["enemies"][row]:
+			if bool(enemy["alive"]):
+				enemy["ap"] = int(enemy["max_ap"])
 
 
 func player_has_ap() -> bool:
@@ -284,80 +541,31 @@ func army_supply() -> int:
 	return int(ceil(float(base) * mult))
 
 
-func _start_battle(event: Dictionary) -> void:
-	var tier := str(event.get("battle", "weak"))
-	var tiers: Dictionary = enemies_data.get("tiers", {})
-	var tier_data: Dictionary = tiers.get(tier, tiers.get("weak", {}))
 
-	var enemies: Array = []
-	for template in tier_data.get("units", []):
-		for i in int(template.get("count", 1)):
-			enemies.append({
-				"name": str(template.get("name", "敌人")),
-				"hp": float(template.get("hp", 8)),
-				"max_hp": float(template.get("hp", 8)),
-				"atk": float(template.get("atk", 2)),
-				"def": float(template.get("def", 0)),
-				"ap": int(template.get("ap", 2)),
-				"max_ap": int(template.get("ap", 2)),
-				"row": str(template.get("row", "front")),
-				"alive": true,
-			})
-
-	var players: Array = []
-	for unit_id in army:
-		var data := unit_info(unit_id)
-		if data.is_empty() or not bool(data.get("combat", false)):
-			continue
-		players.append({
-			"name": str(data.get("name", unit_id)),
-			"hp": float(data.get("hp", 8)),
-			"max_hp": float(data.get("hp", 8)),
-			"atk": float(data.get("atk", 2)),
-			"def": float(data.get("def", 0)),
-			"ap": int(data.get("ap", 2)),
-			"max_ap": int(data.get("ap", 2)),
-			"row": str(data.get("row", "front")),
-			"alive": true,
-		})
-
-	var supply := army_supply()
-
-	if int(resources["food"]) < supply:
-		resources["food"] = 0
-		health = maxf(0.0, health - 2.0)
-		_add_log("补给不足（需要 %d 食物），强行出战，巢穴 -2。" % supply)
-	else:
-		resources["food"] = int(resources["food"]) - supply
-
-	battle = {
-		"enemies": enemies,
-		"player": players,
-		"round": 1,
-		"supply": supply,
-		"event": event,
-		"result": "",
-	}
-	phase = Phase.BATTLE
-	_add_log("战斗开始：敌方 %d 只，我方 %d 只，补给 -%d 食物。" % [
-		enemies.size(), players.size(), supply
-	])
-
-
-func _finish_battle(victory: bool) -> void:
+func _finish_battle(victory: bool, ruling: bool = false) -> void:
 	var event: Dictionary = battle.get("event", {})
-	battle["result"] = "win" if victory else "lose"
+	battle["result"] = "ruling" if ruling else ("win" if victory else "lose")
 
 	if victory:
-		_apply_effects(event.get("effects", {}))
+		var effects: Dictionary = event.get("effects", {})
+		if ruling:
+			var reduced := {}
+			for key in effects.keys():
+				if str(key) == "food":
+					reduced[key] = int(floor(float(int(effects[key])) / 2.0))
+			effects = reduced
+			_add_log("最终裁决：按未击杀结算，只给减少后的防守奖励。")
+		_apply_effects(effects)
 		_add_log("战斗胜利，战利品已结算。")
 	else:
 		var penalty := int(balance.get("combat", {}).get("defeat_health", 10))
 		health = maxf(0.0, health - penalty)
-		_add_log("战斗失败：巢穴 -%d，士兵返场。" % penalty)
+		_add_log("战斗失败：巢穴 -%d，士兵返场（HP 下场回满）。" % penalty)
 
 	_tick_planted()
 	battle = {}
+	deploy_units = []
+	pending_event = {}
 	if health <= 0.0:
 		_fail_game()
 		return
@@ -365,35 +573,12 @@ func _finish_battle(victory: bool) -> void:
 
 
 func _next_ready_player() -> Dictionary:
-	var players: Array = battle.get("player", [])
-	for unit in players:
-		if bool(unit["alive"]) and int(unit["ap"]) > 0:
-			return unit
+	var players: Dictionary = battle.get("player", {})
+	for row in ["front", "back"]:
+		for unit in players.get(row, []):
+			if bool(unit["alive"]) and int(unit["ap"]) > 0:
+				return unit
 	return {}
-
-
-func _front_target(units: Array) -> Dictionary:
-	for unit in units:
-		if bool(unit["alive"]) and str(unit["row"]) == "front":
-			return unit
-	for unit in units:
-		if bool(unit["alive"]):
-			return unit
-	return {}
-
-
-func _row_alive(units: Array, row: String) -> bool:
-	for unit in units:
-		if bool(unit["alive"]) and str(unit["row"]) == row:
-			return true
-	return false
-
-
-func _any_alive(units: Array) -> bool:
-	for unit in units:
-		if bool(unit["alive"]):
-			return true
-	return false
 
 
 # ---------------------------------------------------------------------------

@@ -10,7 +10,8 @@
       "name": "强大敌对势力",
       "units": [
         { "name": "敌兵蚁", "hp": 12.0, "atk": 3.0, "ap": 2, "row": "front", "count": 2 },
-        { "name": "敌卫兵", "hp": 18.0, "atk": 2.0, "ap": 2, "row": "front", "count": 1 }
+        { "name": "敌卫兵", "hp": 18.0, "atk": 2.0, "ap": 2, "row": "front", "count": 1 },
+        { "name": "敌喷酸虫", "hp": 8.0, "atk": 3.0, "ap": 1, "row": "back", "count": 1 }
       ]
     }
   }
