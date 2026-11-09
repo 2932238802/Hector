@@ -97,7 +97,8 @@ doc/
 │   ├── boundary.md                # 设计层 / 实现层职责边界
 │   ├── data-contract.md           # data/*.json 字段与校验
 │   ├── tuning-tool.md             # 网页调参工具需求
-│   └── hot-reload.md              # Godot 热更需求
+│   ├── hot-reload.md              # Godot 热更需求
+│   └── dev-status.md              # 代码 ↔ 文档审计与开发待办
 ├── handbook/                      # 设计手册网页（只读；随 doc 更新）
 │   ├── index.html                 # 双击打开
 │   ├── data.js                    # 手册数据，改设计后同步
@@ -150,6 +151,7 @@ doc/
 | `05-handoff/data-contract.md` | living | `data/*.json` 文件划分、字段、枚举、校验规则 |
 | `05-handoff/tuning-tool.md` | living | 网页调参工具的功能、接口与验收标准（开发实现） |
 | `05-handoff/hot-reload.md` | living | Godot 热更：生效时机、行为契约、验收标准（开发实现） |
+| `05-handoff/dev-status.md` | living | 代码 ↔ 文档审计：已实现 / 未实现 / 矛盾 / 开发待办（只读审计，不改变设计） |
 | `handbook/index.html` | living | 设计手册网页：兵种 / 敌人 / 虫种 / 虫珀 / 势力 / 事件 / 枚举 / 数值；数据在 `handbook/data.js` |
 
 > 新文档建立后，必须在这里补一行。
