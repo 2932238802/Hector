@@ -17,7 +17,6 @@ var log_label: RichTextLabel
 var season_label: Label
 var progress_label: Label
 var resources_label: Label
-var workers_label: Label
 var army_label: Label
 var health_label: Label
 var health_bar: ProgressBar
@@ -193,9 +192,6 @@ func _build_hud() -> Control:
 	resources_label = Label.new()
 	box.add_child(resources_label)
 
-	workers_label = Label.new()
-	box.add_child(workers_label)
-
 	army_label = Label.new()
 	box.add_child(army_label)
 
@@ -283,7 +279,6 @@ func _refresh() -> void:
 	resources_label.text = "食物 %d   巢穴经验 %d   种子 %d（已种 %d）" % [
 		int(game.resources["food"]), game.exp_points, game.seeds.size(), game.planted.size()
 	]
-	workers_label.text = "工蚁 %d" % game.workers
 	army_label.text = "军队 %d/%d" % [game.army.size(), int(game.balance["army"]["max_size"])]
 	health_label.text = "巢穴 %d/%d" % [int(game.health), int(game.max_health())]
 	health_bar.max_value = game.max_health()
@@ -350,18 +345,18 @@ func _build_actions() -> void:
 	]))
 
 	_add_action_button(
-		"冒险", "派 1–3 只工蚁外出：食物 +2~4，可能带回种子；巢穴 -2", "adventure"
+		"冒险", "外出探索：食物 -1~2（雨天 / 春季 +1），回来 +2~4，可能带回种子；巢穴 -2", "adventure"
 	)
 	_add_action_button(
-		"巢穴恢复", "消耗 4 食物，巢穴完整度 +18（远高于工蚁被动恢复）", "heal"
+		"巢穴恢复", "消耗 4 食物，巢穴完整度 +18（唯一的恢复手段）", "heal"
 	)
 	var expand_cost := 0
-	var thresholds: Array = game.balance["actions"]["expand"].get("exp_threshold", [0, 0, 20, 30])
+	var thresholds: Array = game.balance["actions"]["expand"].get("exp_threshold", [0, 20, 30])
 	if game.nest_level < int(game.balance["nest"]["max_level"]):
 		expand_cost = maxi(0, int(thresholds[game.nest_level]) - game.exp_points)
 	_add_action_button(
 		"巢穴扩建", "走巢穴经验线：1 食物 = 1 经验，本次需 %d 食物（Lv.%d → Lv.%d，+3 肥沃格）" % [
-			expand_cost, game.nest_level, mini(game.nest_level + 1, 4)
+			expand_cost, game.nest_level, mini(game.nest_level + 1, 3)
 		], "expand"
 	)
 
@@ -457,10 +452,8 @@ func _build_event() -> void:
 	var is_battle: bool = event.has("battle")
 	side_box.add_child(_hint(("战利品：" if is_battle else "影响：") + _effects_text(event.get("effects", {}))))
 	if is_battle:
-		side_box.add_child(_hint("敌方：%s · 我方补给 %d 食物" % [
-			game.battle_tier_name(str(event["battle"])), game.army_supply()
-		]))
-		side_box.add_child(_hint("谈判代价 2 食物为占位（Q-084）；回避放弃战利品。"))
+		side_box.add_child(_hint("敌方：%s · 出战不扣食物" % game.battle_tier_name(str(event["battle"]))))
+		side_box.add_child(_hint("谈判 / 回避的代价见事件选项；旧式事件仍用 2 食物占位（Q-084）。"))
 		var fight_button := Button.new()
 		fight_button.text = "迎战（进入布阵）"
 		fight_button.custom_minimum_size = Vector2(0, 48)
@@ -492,15 +485,15 @@ func _build_deploy() -> void:
 	side_box.add_child(_title("布阵（前 %d / 后 %d）" % [
 		int(game.balance["army"]["front"]), int(game.balance["army"]["back"])
 	]))
-	side_box.add_child(_hint("开战前按实际出战单位支付补给；食物不够就撤下单位。空位允许。"))
+	side_box.add_child(_hint("布阵确认后直接开战，出战不扣食物（Q-052）。空位允许。"))
 
 	for entry in game.deploy_units:
 		var box := HBoxContainer.new()
 		var label := Label.new()
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		label.text = "%s · %s · 补给 %d%s" % [
+		label.text = "%s · %s%s" % [
 			str(entry["name"]), "前排" if str(entry["row"]) == "front" else "后排",
-			int(entry["supply"]), "" if bool(entry["deployed"]) else "（后备）"
+			"" if bool(entry["deployed"]) else "（后备）"
 		]
 		label.add_theme_font_size_override("font_size", 15)
 		box.add_child(label)
@@ -519,14 +512,10 @@ func _build_deploy() -> void:
 		box.add_child(out_button)
 		side_box.add_child(box)
 
-	var supply: int = game.deploy_supply()
-	side_box.add_child(_hint("出战 %d 个 · 补给 %d 食物（现有 %d）%s" % [
-		game.deployed_count(), supply, int(game.resources["food"]),
-		"" if int(game.resources["food"]) >= supply else " · 食物不足"
-	]))
+	side_box.add_child(_hint("出战 %d 个 · 开战不扣食物" % game.deployed_count()))
 
 	var start_button := Button.new()
-	start_button.text = "开战（补给 -%d 食物）" % supply
+	start_button.text = "开战"
 	start_button.custom_minimum_size = Vector2(0, 50)
 	start_button.disabled = not game.can_start_battle()
 	start_button.pressed.connect(_on_start_battle)
@@ -545,8 +534,8 @@ func _build_end() -> void:
 	side_box.add_child(_hint(
 		game.season_summary() if won else "第 %d 回合，巢穴完整度归零。" % game.turn
 	))
-	side_box.add_child(_hint("巢穴 Lv.%d · 工蚁 %d · 种子 %d 粒（已种 %d）" % [
-		game.nest_level, game.workers, game.seeds.size(), game.planted.size()
+	side_box.add_child(_hint("巢穴 Lv.%d · 种子 %d 粒（已种 %d）" % [
+		game.nest_level, game.seeds.size(), game.planted.size()
 	]))
 
 	var button := Button.new()
@@ -635,9 +624,9 @@ func _build_recruit() -> void:
 		button.disabled = not game.can_recruit(unit_id)
 		button.pressed.connect(_on_recruit.bind(unit_id))
 		side_box.add_child(button)
-		side_box.add_child(_hint("%s · 生命 %.1f / 攻击 %.1f / 补给 %d · %s" % [
+		side_box.add_child(_hint("%s · 生命 %.1f / 攻击 %.1f · %s" % [
 			str(data.get("tag", "")), float(data.get("hp", 0.0)), float(data.get("atk", 0.0)),
-			int(data.get("supply", 0)), str(data.get("signature", ""))
+			str(data.get("signature", ""))
 		]))
 
 	if not game.recruit_free:
@@ -709,7 +698,7 @@ func _hint(text: String) -> Label:
 
 func _effects_text(effects: Dictionary) -> String:
 	var names := {
-		"health": "巢穴", "food": "食物", "workers": "工蚁",
+		"health": "巢穴", "food": "食物", "integrity_delta": "巢穴", "food_delta": "食物",
 	}
 	var parts: Array[String] = []
 	for key in names.keys():
@@ -717,8 +706,8 @@ func _effects_text(effects: Dictionary) -> String:
 			var value := int(effects[key])
 			if value != 0:
 				parts.append("%s %s%d" % [names[key], "+" if value > 0 else "", value])
-	if effects.has("seed"):
-		var value = effects["seed"]
+	if effects.has("seed") or effects.has("gain_seed"):
+		var value = effects.get("seed", effects.get("gain_seed"))
 		if value is String and str(value) != "":
 			parts.append("种子 " + str(value))
 		elif bool(value):

@@ -34,7 +34,6 @@ var event_index := 0
 var phase: int = Phase.ACTION
 var health := 100.0
 var resources := {"food": 0}
-var workers := 0
 var exp_points := 0
 var seeds: Array[String] = []
 var planted: Array = []
@@ -83,8 +82,7 @@ func start_new_game(p_seed: int = 0) -> void:
 	event_index = 0
 	season_weathers = []
 	weather_index = 0
-	nest_level = int(balance["start"].get("nest_level", 2))
-	workers = int(balance["start"]["workers"])
+	nest_level = int(balance["start"].get("nest_level", 1))
 	health = float(balance["start"]["health"])
 	resources = {"food": int(balance["start"]["food"])}
 	exp_points = 0
@@ -133,18 +131,6 @@ func _begin_turn() -> void:
 	weather = season_weathers[weather_index]
 	weather_index += 1
 
-	var pop := workers + army.size()
-	var upkeep := int(balance["upkeep"]["base"]) + int(ceili(float(pop) / float(balance["upkeep"]["per_pop"])))
-	var paid := mini(upkeep, int(resources["food"]))
-	resources["food"] = int(resources["food"]) - paid
-	workers += int(balance["queen"]["workers_per_turn"])
-
-	var heal_amount := minf(
-		float(workers) * float(balance["heal"]["per_worker"]),
-		float(balance["heal"]["cap"])
-	)
-	health = minf(max_health(), health + heal_amount)
-
 	groups = EventPoolScript.build_groups(
 		rng, event_data, event_templates_data, int(balance["event_groups_per_turn"]), season
 	)
@@ -155,10 +141,10 @@ func _begin_turn() -> void:
 	pending_event = {}
 	recruit_candidates = []
 	phase = Phase.ACTION
-	_add_log("第 %d 回合（%s 第 %d/%d 回合，总 %d/%d）· 天气 %s：维持 -%d 食物，工蚁 +%d，巢穴恢复 +%d。" % [
+	# 2026-11-09：工蚁 / 维持 / 被动恢复已删除，回合开始只做收入汇报（Q-035）。
+	_add_log("第 %d 回合（%s 第 %d/%d 回合，总 %d/%d）· 天气 %s：食物 %d，已播种 %d 块，事件内预计食物 +%d。" % [
 		turn, season_name(), turn_in_season(), TURNS_PER_SEASON, turn, TOTAL_TURNS,
-		weather_name(), paid,
-		int(balance["queen"]["workers_per_turn"]), int(heal_amount)
+		weather_name(), int(resources["food"]), planted.size(), _forecast_food_per_turn()
 	])
 	changed.emit()
 
@@ -300,7 +286,10 @@ func choose_event_option(index: int) -> bool:
 	if cost > 0:
 		resources["food"] = int(resources["food"]) - cost
 
-	_apply_effects(option.get("effects", {}))
+	var effects: Dictionary = option.get("effects", {}).duplicate(true)
+	if option.has("rain_food") and weather == "rain":
+		effects["food"] = int(option["rain_food"])
+	_apply_effects(effects)
 	var roll: Dictionary = option.get("roll", {})
 	if not roll.is_empty():
 		if rng.randf() < float(roll.get("chance", 0.0)):
@@ -361,7 +350,6 @@ func _open_deploy(event: Dictionary) -> void:
 			"unit_id": unit_id,
 			"name": str(data.get("name", unit_id)),
 			"row": row,
-			"supply": int(data.get("supply", 1)),
 			"deployed": deployed,
 		})
 	battle = {}
@@ -419,36 +407,22 @@ func deployed_count() -> int:
 
 
 func deploy_supply() -> int:
-	var base := 0
-	for entry in deploy_units:
-		if bool(entry["deployed"]):
-			base += int(entry["supply"])
-	var mult := _weather_effect("supply_mult", 1.0)
-	return int(ceil(float(base) * mult))
+	# 2026-11-09 Q-052：战斗补给已取消，保留方法给 UI 兼容。
+	return 0
 
 
 func can_start_battle() -> bool:
-	return (
-		phase == Phase.DEPLOY
-		and deployed_count() > 0
-		and int(resources["food"]) >= deploy_supply()
-	)
+	return phase == Phase.DEPLOY and deployed_count() > 0
 
 
 func start_battle() -> bool:
 	if phase != Phase.DEPLOY:
 		return false
-	var supply := deploy_supply()
 	if deployed_count() <= 0:
 		_add_log("没有出战单位，无法迎战。")
 		changed.emit()
 		return false
-	if int(resources["food"]) < supply:
-		_add_log("食物不足（补给需要 %d），先撤下单位。" % supply)
-		changed.emit()
-		return false
 
-	resources["food"] = int(resources["food"]) - supply
 	var players_front: Array = []
 	var players_back: Array = []
 	for entry in deploy_units:
@@ -472,7 +446,7 @@ func start_battle() -> bool:
 	var enemies_back: Array = []
 	for template in _tier_units(str(pending_event.get("battle", "weak"))):
 		for i in int(template.get("count", 1)):
-			var enemy_mult := float(balance.get("spring", {}).get("enemy_mult", 1.0))
+			var enemy_mult := float(balance.get("spring", {}).get("enemy_scale", 1.0))
 			var unit := _make_unit(
 				str(template.get("name", "敌人")),
 				snappedf(float(template.get("hp", 8)) * enemy_mult, 0.1),
@@ -494,16 +468,15 @@ func start_battle() -> bool:
 		"player": {"front": players_front, "back": players_back},
 		"enemies": {"front": enemies_front, "back": enemies_back},
 		"round": 1,
-		"supply": supply,
 		"event": pending_event,
 		"result": "",
 	}
 	battle_count += 1
 	_start_round_effects()
 	phase = Phase.BATTLE
-	_add_log("战斗开始：我方 %d 只，敌方 %d 只，补给 -%d 食物。" % [
+	_add_log("战斗开始：我方 %d 只，敌方 %d 只。" % [
 		players_front.size() + players_back.size(),
-		enemies_front.size() + enemies_back.size(), supply
+		enemies_front.size() + enemies_back.size()
 	])
 	changed.emit()
 	return true
@@ -718,16 +691,11 @@ func player_has_ap() -> bool:
 
 
 func army_base_supply() -> int:
-	var supply := 0
-	for unit_id in army:
-		supply += int(unit_info(unit_id).get("supply", 0))
-	return supply
+	return 0
 
 
 func army_supply() -> int:
-	var base := army_base_supply()
-	var mult := _weather_effect("supply_mult", 1.0)
-	return int(ceil(float(base) * mult))
+	return 0
 
 
 
@@ -960,7 +928,7 @@ func _tier_rates() -> Array:
 	var key := str(nest_level)
 	if table.has(key):
 		return table[key]
-	return table.get("4", [])
+	return table.get("3", [])
 
 
 func _roll_tier(rates: Array) -> int:
@@ -1097,14 +1065,15 @@ func _fail_game() -> void:
 
 func _do_adventure() -> bool:
 	var cfg: Dictionary = balance["actions"]["adventure"]
-	var cost := rng.randi_range(int(cfg["workers_min"]), int(cfg["workers_max"]))
-	cost += int(_weather_effect("adventure_workers", 0.0))
-	cost = mini(cost, workers)
-	if cost <= 0:
-		_add_log("没有可派出的工蚁，冒险无法进行。")
+	# 2026-11-09：探索代价由工蚁改为食物（Q-039 / Q-053）。
+	var cost := rng.randi_range(int(cfg.get("food_cost_min", 1)), int(cfg.get("food_cost_max", 2)))
+	cost += int(_weather_effect("explore_food_loss", 0.0))
+	cost += int(balance.get("spring", {}).get("explore_food_loss", 0)) if season == 0 else 0
+	if int(resources["food"]) < cost:
+		_add_log("食物不足（探索需要 %d），冒险无法进行。" % cost)
 		return false
 
-	workers -= cost
+	resources["food"] = int(resources["food"]) - cost
 	var gain := rng.randi_range(int(cfg["food_min"]), int(cfg["food_max"]))
 	gain += int(_weather_effect("adventure_food", 0.0)) + _season_modifier("adventure_food")
 	gain = maxi(0, gain)
@@ -1121,8 +1090,8 @@ func _do_adventure() -> bool:
 			var seed_id := str(pool[rng.randi_range(0, pool.size() - 1)])
 			seeds.append(seed_id)
 			note = "，带回种子【%s】" % _seed_name(seed_id)
-	_add_log("冒险（%s）：派出 %d 只工蚁，食物 +%d%s，巢穴 %s%d。" % [
-		weather_name(), cost, gain, note, "+" if health_delta >= 0.0 else "", int(health_delta)
+	_add_log("冒险（%s）：食物 -%d / +%d（净 %+d）%s，巢穴 %s%d。" % [
+		weather_name(), cost, gain, gain - cost, note, "+" if health_delta >= 0.0 else "", int(health_delta)
 	])
 	return true
 
@@ -1164,8 +1133,8 @@ func _do_expand() -> bool:
 
 	nest_level += 1
 	exp_points = 0
-	# 升阶后第一次招募保底：至少 1 个新阶级单位（Q-103）。L3 → 二阶，L4 → 三阶。
-	recruit_pity_tier = nest_level - 1
+	# 升阶后第一次招募保底：至少 1 个新阶级单位（Q-103）。L2 → 二阶，L3 → 三阶。
+	recruit_pity_tier = nest_level
 	var before_count := cells.size()
 	_rebuild_cells()
 	_add_log("巢穴扩建：Lv.%d，消耗 %d 食物，新增 %d 格（肥沃格累计 %d，其中可用 %d）。" % [
@@ -1175,14 +1144,15 @@ func _do_expand() -> bool:
 
 
 func _apply_effects(effects: Dictionary) -> void:
-	if effects.has("health"):
-		health = clampf(health + float(effects["health"]), 0.0, max_health())
-	if effects.has("food"):
-		resources["food"] = maxi(0, int(resources["food"]) + int(effects["food"]))
-	if effects.has("workers"):
-		workers = maxi(0, workers + int(effects["workers"]))
-	if effects.has("seed"):
-		var value = effects["seed"]
+	# 兼容两套字段：旧 effects（health/food/seed/warspoil/amber）与 data-contract v1。
+	var health_delta := float(effects.get("health", effects.get("integrity_delta", 0.0)))
+	if health_delta != 0.0:
+		health = clampf(health + health_delta, 0.0, max_health())
+	var food_delta := int(effects.get("food", effects.get("food_delta", 0)))
+	if food_delta != 0:
+		resources["food"] = maxi(0, int(resources["food"]) + food_delta)
+	if effects.has("seed") or effects.has("gain_seed"):
+		var value = effects.get("seed", effects.get("gain_seed"))
 		if value is String and str(value) != "":
 			seeds.append(str(value))
 		elif bool(value):
@@ -1191,8 +1161,13 @@ func _apply_effects(effects: Dictionary) -> void:
 				seeds.append(str(pool[rng.randi_range(0, pool.size() - 1)]))
 	if effects.has("warspoil"):
 		warfruits["warspoil"] = int(warfruits.get("warspoil", 0)) + int(effects["warspoil"])
+	if effects.has("gain_result") and str(effects["gain_result"]) != "":
+		var rid := str(effects["gain_result"])
+		warfruits[rid] = int(warfruits.get(rid, 0)) + 1
 	if effects.has("amber"):
 		amber += int(effects["amber"])
+	if effects.has("gain_relic") and str(effects["gain_relic"]) != "":
+		amber += 1
 
 
 # ---------------------------------------------------------------------------
@@ -1298,7 +1273,10 @@ func _harvest(info: Dictionary) -> void:
 	var name := str(info.get("name", "种子"))
 	match kind:
 		"food":
-			var bonus := int(balance.get("spring", {}).get("seed_food_bonus", 0)) if season == 0 else 0
+			# 春季生产 +1（Q-057 占位）；晴天生产加成尚未接入。
+			var bonus := 0
+			if season == 0:
+				bonus += int(balance.get("spring", {}).get("production_bonus", 0))
 			resources["food"] = int(resources["food"]) + amount + bonus
 			_add_log("【%s】收获：食物 +%d。" % [name, amount + bonus])
 		"warspoil":
@@ -1345,7 +1323,7 @@ func _rebuild_cells() -> void:
 	cells = []
 	var blocked: Array = blocked_dirs
 	var fertile_per_ring := int(balance["nest"].get("fertile_per_ring", 3))
-	for ring in range(0, nest_level):
+	for ring in range(0, nest_level + 1):
 		var ring_cells: Array = HexGridScript.ring_cells(ring)
 		var fertile_dirs := _fertile_directions(ring, fertile_per_ring, blocked)
 		var used_dirs := {}
@@ -1401,6 +1379,10 @@ func _load_json(path: String) -> Dictionary:
 	var parsed = JSON.parse_string(text)
 	if typeof(parsed) != TYPE_DICTIONARY:
 		push_error("数据文件不是 JSON 对象：%s" % path)
+		return {}
+	# data-contract v1：顶层必须含 schema_version: 1。
+	if int(parsed.get("schema_version", 0)) != 1:
+		push_error("数据文件缺少或非法 schema_version（应为 1）：%s" % path)
 		return {}
 	return parsed
 

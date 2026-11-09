@@ -1,4 +1,5 @@
 {
+  "schema_version": 1,
   "categories": ["enemy_weak", "enemy_strong", "explore", "random", "recruit", "relic"],
   "events": [
     {
@@ -56,8 +57,8 @@
       "title": "腐木探路",
       "text": "一截腐木横在通道里，里面传来细碎的爬动声。",
       "options": [
-        { "label": "深入（工蚁 -2，得 1 食物种子）", "effects": { "workers": -2, "seed": "grain_basic" } },
-        { "label": "浅探（工蚁 -1，+2 食物）", "effects": { "workers": -1, "food": 2 } },
+        { "label": "深入（食物 -2，得 1 食物种子）", "food_cost": 2, "effects": { "seed": "grain_basic" } },
+        { "label": "浅探（食物 -1，+2 食物）", "food_cost": 1, "effects": { "food": 2 } },
         { "label": "放弃", "effects": {} }
       ]
     },
@@ -68,7 +69,7 @@
       "title": "露水洼",
       "text": "草叶下积着一小洼露水，水面映着晃动的人影。",
       "options": [
-        { "label": "取水（+3 食物）", "effects": { "food": 3 } },
+        { "label": "取水（+3 食物，雨天 +6）", "effects": { "food": 3 }, "rain_food": 6 },
         { "label": "观察（看下回合天气）", "observe": true },
         { "label": "离开", "effects": {} }
       ]
@@ -101,21 +102,10 @@
       "category": "random",
       "pressure": true,
       "title": "掠食鸟影",
-      "text": "一道影子从头顶掠过，工蚁四散。",
+      "text": "一道影子从头顶掠过，巢口一阵骚动。",
       "options": [
-        { "label": "隐蔽（工蚁 -1）", "effects": { "workers": -1 } },
+        { "label": "隐蔽（食物 -1，代价待定）", "effects": { "food": -1 } },
         { "label": "转移（食物 -1）", "effects": { "food": -1 } }
-      ]
-    },
-    {
-      "id": "random_lost_worker",
-      "category": "random",
-      "pressure": false,
-      "title": "迷路工蚁",
-      "text": "一只工蚁绕着同一块石头转了很久。",
-      "options": [
-        { "label": "带回（工蚁 +1）", "effects": { "workers": 1 } },
-        { "label": "放弃", "effects": {} }
       ]
     },
     {

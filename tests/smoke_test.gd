@@ -72,14 +72,13 @@ func _test_new_game() -> void:
 	check(game.free_recruits_left == 2, "2 free recruits queued")
 	check(game.recruit_candidates.size() == 3, "opening offers 3 candidates")
 	check(game.season_name() == "春", "starts in spring")
-	check(int(game.resources["food"]) == 13, "15 food - 2 upkeep")
+	check(int(game.resources["food"]) == 15, "starts with 15 food (no upkeep)")
 	check(game.resources.keys() == ["food"], "food is the only resource")
-	check(game.workers == 6, "queen spawned 2 workers (4 + 2)")
 	check(is_equal_approx(game.health, 100.0), "start health 100")
 	check(game.groups.size() == 3, "3 event groups generated")
-	check(game.cells.size() == 7, "L2 start = 7 cells")
-	check(game.nest_blocked_cells() == 1, "river blocks 1 cell at L2")
-	check(game.nest_level == 2, "starts at nest level 2")
+	check(game.cells.size() == 7, "L1 start = 7 cells")
+	check(game.nest_blocked_cells() == 1, "river blocks 1 cell at L1")
+	check(game.nest_level == 1, "starts at nest level 1")
 	check(game.seeds.is_empty(), "no seeds in inventory at start")
 	check(game.planted.size() == 1, "starting seed is already planted")
 	check(game.army.is_empty(), "no fixed starting army")
@@ -138,16 +137,17 @@ func _test_event_options() -> void:
 
 func _test_nest_expansion() -> void:
 	var game = _boot(7)
-	check(not game.choose_action("expand"), "expansion rejected with 15 food (needs 25)")
+	check(not game.choose_action("expand"), "expansion rejected with 15 food (needs 20)")
 	check(game.phase == GameStateScript.Phase.ACTION, "failed expansion stays in ACTION")
 
 	game.resources["food"] = 40
 	check(game.choose_action("expand"), "expansion succeeds with 40 food")
-	check(game.nest_level == 3, "nest reaches level 3")
-	check(game.cells.size() == 19, "L3 = 1 + 6 + 12 cells (blocked cells included)")
-	check(game.nest_blocked_cells() == 2, "river blocks 2 cells at L3")
-	check(int(game.resources["food"]) == 15, "expansion costs 25 food (L2 -> L3)")
+	check(game.nest_level == 2, "nest reaches level 2")
+	check(game.cells.size() == 19, "L2 = 1 + 6 + 12 cells (blocked cells included)")
+	check(game.nest_blocked_cells() == 2, "river blocks 2 cells at L2")
+	check(int(game.resources["food"]) == 20, "expansion costs 20 food (L1 -> L2)")
 	check(game.phase == GameStateScript.Phase.GROUP_SELECT, "expansion advances to GROUP_SELECT")
+	check(game.fertile_count() == 6, "L2 has 6 fertile cells")
 
 
 func _test_seed_planting() -> void:
@@ -186,7 +186,7 @@ func _test_turn_flow() -> void:
 	var game = _boot(99)
 	game.health = 50.0
 	check(game.choose_action("heal"), "heal succeeds (food 15 >= 4)")
-	check(int(game.resources["food"]) == 9, "heal costs 4 food (13 - 4)")
+	check(int(game.resources["food"]) == 11, "heal costs 4 food (15 - 4)")
 	check(game.health > 50.0, "heal raises health")
 	check(game.phase == GameStateScript.Phase.GROUP_SELECT, "action advances to GROUP_SELECT")
 
@@ -258,39 +258,41 @@ func _test_weather() -> void:
 	check(game.season_weathers.size() == 6, "6 weather states per season")
 	check(game.forecast_weather(0) == game.weather, "forecast offset 0 = current weather")
 
-	# 雨天：战斗补给 3 -> 5（×1.5 向上取整）
+	# 雨天：出战不扣食物（Q-052 补给已取消）
 	var battle_game = _boot(2026)
 	battle_game.weather = "rain"
 	_force_single_event(battle_game, {
-		"id": "weather_battle", "category": "enemy", "pressure": true,
+		"id": "weather_battle", "category": "enemy_weak", "pressure": true,
 		"title": "雨天敌袭", "text": "", "battle": "sand", "effects": {},
 	})
 	battle_game.choose_encounter("fight")
 	check(battle_game.phase == GameStateScript.Phase.DEPLOY, "rain battle enters DEPLOY")
-	check(battle_game.deploy_supply() == 5, "rain raises battle supply 3 -> 5")
+	check(battle_game.deploy_supply() == 0, "battle supply removed")
 	var food_before := int(battle_game.resources["food"])
 	check(battle_game.start_battle(), "rain battle starts")
-	check(int(battle_game.resources["food"]) == food_before - 5, "rain supply is paid (5 food)")
+	check(int(battle_game.resources["food"]) == food_before, "starting a battle costs no food")
 
-	# 雨天：冒险工蚁消耗 +1，完整度 -3（基础 -2 + 雨天 -1）
+	# 雨天：探索食物损失 +1，完整度 -3（基础 -2 + 雨天 -1）
 	var adventure_game = _boot(11)
+	adventure_game.season = 1
 	adventure_game.weather = "rain"
-	adventure_game.workers = 10
 	adventure_game.resources["food"] = 50
 	var health_before: float = adventure_game.health
 	check(adventure_game.choose_action("adventure"), "adventure works in rain")
-	check(adventure_game.workers >= 6 and adventure_game.workers <= 8, "rain adds 1 worker cost")
+	check(
+		int(adventure_game.resources["food"]) >= 49 and int(adventure_game.resources["food"]) <= 52,
+		"rain adds 1 food cost to adventure"
+	)
 	check(is_equal_approx(health_before - adventure_game.health, 3.0), "rain adds 1 health loss to adventure")
-	check(int(adventure_game.resources["food"]) >= 52, "rain adventure still gains food")
 
 	# 晴天：冒险食物 +1（基础 2–4 -> 3–5）
 	var sunny_game = _boot(12)
+	sunny_game.season = 1
 	sunny_game.weather = "clear"
-	sunny_game.workers = 10
 	sunny_game.resources["food"] = 50
 	sunny_game.choose_action("adventure")
 	check(
-		int(sunny_game.resources["food"]) >= 53 and int(sunny_game.resources["food"]) <= 55,
+		int(sunny_game.resources["food"]) >= 51 and int(sunny_game.resources["food"]) <= 54,
 		"clear weather adds 1 adventure food"
 	)
 
@@ -307,16 +309,16 @@ func _test_battle() -> void:
 	check(game.phase == GameStateScript.Phase.DEPLOY, "enters DEPLOY phase")
 	check(game.deploy_units.size() == 3, "all 3 units listed for deployment")
 	check(game.deployed_count() == 3, "all units deployed by default")
-	check(game.deploy_supply() == 3, "deploy supply = 3")
-	check(game.can_start_battle(), "can start with 15 food")
+	check(game.deploy_supply() == 0, "no battle supply")
+	check(game.can_start_battle(), "can start with any food")
 
 	check(game.deploy_set("caiwei", ""), "can bench a unit")
-	check(game.deploy_supply() == 2, "benching drops supply to 2")
+	check(game.deployed_count() == 2, "benching removes one unit")
 	check(game.deploy_set("caiwei", "back"), "can redeploy the unit")
-	check(game.deploy_supply() == 3, "redeploy restores supply to 3")
+	check(game.deployed_count() == 3, "redeploy restores 3")
 	check(game.start_battle(), "battle starts")
 	check(game.phase == GameStateScript.Phase.BATTLE, "enters BATTLE phase")
-	check(int(game.resources["food"]) == food_before - 3, "supply paid per deployed unit (3 food)")
+	check(int(game.resources["food"]) == food_before, "starting a battle costs no food")
 	check(game.battle["enemies"]["front"].size() == 2, "weak tier front = 2")
 	check(game.battle["enemies"]["back"].size() == 0, "weak tier back = 0")
 
@@ -325,7 +327,7 @@ func _test_battle() -> void:
 	check(game.phase != GameStateScript.Phase.BATTLE, "battle ends")
 	check(game.battle.is_empty(), "battle state cleared")
 	check(game.army.size() == 3, "units return after battle (army unchanged)")
-	var loot := int(game.resources["food"]) - (food_before - 3)
+	var loot := int(game.resources["food"]) - food_before
 	check(loot >= 2 and loot <= 4, "victory gives 2-4 food loot (got %d)" % loot)
 	check(game.health > 0.0, "victory does not damage the nest")
 
@@ -429,7 +431,7 @@ func _test_recruit() -> void:
 	check(game.recruit_candidates.size() == 3, "3 recruit candidates")
 	for unit_id in game.recruit_candidates:
 		var data: Dictionary = game.unit_info(unit_id)
-		check(int(data.get("tier", 1)) == 1, "L2 recruits are tier 1: " + unit_id)
+		check(int(data.get("tier", 1)) == 1, "L1 recruits are tier 1: " + unit_id)
 		check(int(data.get("cost", {}).get("food", 99)) <= 15, "candidates are affordable: " + unit_id)
 
 	var food_before := int(game.resources["food"])
@@ -456,14 +458,15 @@ func _test_recruit() -> void:
 
 
 func _test_recruit_tiers() -> void:
-	# 升 L3 后的第一次招募必出二阶。
+	# 升 L2 后的第一次招募必出二阶；升 L3 后必出三阶。
 	var game = _boot(778)
-	game.resources["food"] = 60
-	check(game.choose_action("expand"), "expand to L3")
-	check(game.nest_level == 3, "nest is L3")
-	check(game.recruit_pity_tier == 2, "upgrade to L3 sets pity tier 2")
+	game.resources["food"] = 90
+	game.phase = GameStateScript.Phase.ACTION
+	check(game.choose_action("expand"), "expand to L2")
+	check(game.nest_level == 2, "nest is L2")
+	check(game.recruit_pity_tier == 2, "upgrade to L2 sets pity tier 2")
 	_force_single_event(game, {
-		"id": "test_recruit_l3", "category": "self", "pressure": false,
+		"id": "test_recruit_l2", "category": "self", "pressure": false,
 		"title": "育婴室", "text": "", "recruit": true, "effects": {},
 	})
 	game.ready_up()
@@ -471,27 +474,24 @@ func _test_recruit_tiers() -> void:
 	for unit_id in game.recruit_candidates:
 		if int(game.unit_info(unit_id).get("tier", 1)) == 2:
 			has_tier2 = true
-	check(has_tier2, "L3 pity guarantees a tier-2 candidate")
+	check(has_tier2, "L2 pity guarantees a tier-2 candidate")
 	check(game.recruit_pity_tier == 0, "pity is consumed after the roll")
 
-	# 升 L4 后的第一次招募必出三阶。
-	var game4 = _boot(779)
-	game4.resources["food"] = 80
-	game4.nest_level = 3
-	game4.exp_points = 0
-	check(game4.choose_action("expand"), "expand to L4")
-	check(game4.nest_level == 4, "nest is L4")
-	check(game4.recruit_pity_tier == 3, "upgrade to L4 sets pity tier 3")
-	_force_single_event(game4, {
-		"id": "test_recruit_l4", "category": "self", "pressure": false,
+	game.skip_recruit()
+	game.phase = GameStateScript.Phase.ACTION
+	check(game.choose_action("expand"), "expand to L3")
+	check(game.nest_level == 3, "nest is L3")
+	check(game.recruit_pity_tier == 3, "upgrade to L3 sets pity tier 3")
+	_force_single_event(game, {
+		"id": "test_recruit_l3", "category": "self", "pressure": false,
 		"title": "育婴室", "text": "", "recruit": true, "effects": {},
 	})
-	game4.ready_up()
+	game.ready_up()
 	var has_tier3 := false
-	for unit_id in game4.recruit_candidates:
-		if int(game4.unit_info(unit_id).get("tier", 1)) == 3:
+	for unit_id in game.recruit_candidates:
+		if int(game.unit_info(unit_id).get("tier", 1)) == 3:
 			has_tier3 = true
-	check(has_tier3, "L4 pity guarantees a tier-3 candidate")
+	check(has_tier3, "L3 pity guarantees a tier-3 candidate")
 
 	# 食物不足时，只出付得起的候选。
 	var poor = _boot(780)
@@ -531,7 +531,7 @@ func _test_full_run() -> void:
 			GameStateScript.Phase.ACTION:
 				if int(game.resources["food"]) >= 4 and game.health < 50.0:
 					game.choose_action("heal")
-				elif game.nest_level < 3 and int(game.resources["food"]) >= 25:
+				elif game.nest_level < 3 and int(game.resources["food"]) >= (20 if game.nest_level == 1 else 30):
 					game.choose_action("expand")
 				elif not game.seeds.is_empty() and not game.free_fertile_cells().is_empty():
 					game.plant_seed(game.seeds[0])

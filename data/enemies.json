@@ -1,28 +1,29 @@
 {
+  "schema_version": 1,
   "tiers": {
     "sand": {
       "name": "沙路截击",
       "units": [
-        { "name": "盾甲", "hp": 8.0, "atk": 1.5, "ap": 1, "row": "front", "count": 2, "shield_per_round": 2.0 }
+        { "id": "dunjia", "name": "盾甲", "family": "beetle", "tier": 1, "hp": 8.0, "atk": 1.5, "ap": 1, "row": "front", "count": 2, "shield_per_round": 2.0, "is_elite": false }
       ]
     },
     "resin": {
       "name": "树脂争夺",
       "units": [
-        { "name": "锹甲", "hp": 6.0, "atk": 2.5, "ap": 1, "row": "front", "count": 2, "weaken_chance": 0.3 }
+        { "id": "qiaojia", "name": "锹甲", "family": "beetle", "tier": 1, "hp": 6.0, "atk": 2.5, "ap": 1, "row": "front", "count": 2, "weaken_chance": 0.3, "is_elite": false }
       ]
     },
     "nest": {
       "name": "巢口巡游",
       "units": [
-        { "name": "结网蛛", "hp": 4.0, "atk": 2.0, "ap": 1, "row": "back", "count": 2, "weaken_per_round": 1 }
+        { "id": "jiewangzhu", "name": "结网蛛", "family": "spider", "tier": 1, "hp": 4.0, "atk": 2.0, "ap": 1, "row": "back", "count": 2, "weaken_per_round": 1, "is_elite": false }
       ]
     },
     "bird": {
       "name": "雀袭（强敌）",
       "units": [
-        { "name": "掠食雀", "hp": 9.0, "atk": 3.0, "ap": 1, "row": "back", "count": 1, "bypass_first": true },
-        { "name": "盾甲", "hp": 8.0, "atk": 1.5, "ap": 1, "row": "front", "count": 1, "shield_per_round": 2.0 }
+        { "id": "lueshique", "name": "掠食雀", "family": "bird", "tier": 1, "hp": 9.0, "atk": 3.0, "ap": 1, "row": "back", "count": 1, "bypass_first": true, "is_elite": true },
+        { "id": "dunjia", "name": "盾甲", "family": "beetle", "tier": 1, "hp": 8.0, "atk": 1.5, "ap": 1, "row": "front", "count": 1, "shield_per_round": 2.0, "is_elite": false }
       ]
     }
   }

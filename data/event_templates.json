@@ -1,4 +1,5 @@
 {
+  "schema_version": 1,
   "templates": [
     { "id": "patrol", "name": "巡逻组", "slots": ["enemy_weak", "explore", "random", "random"], "crisis": false, "relic": false },
     { "id": "expedition", "name": "远征组", "slots": ["enemy_weak", "explore", "explore", "recruit"], "crisis": false, "relic": false },

@@ -1,31 +1,19 @@
 {
+  "schema_version": 1,
   "max_health": 100,
   "start": {
     "health": 100,
     "food": 15,
-    "workers": 4,
-    "nest_level": 2,
+    "nest_level": 1,
     "seed": "grain_basic",
-    "army": [],
     "free_recruits": 2
-  },
-  "queen": {
-    "workers_per_turn": 2
-  },
-  "upkeep": {
-    "base": 1,
-    "per_pop": 5
-  },
-  "heal": {
-    "per_worker": 0.6,
-    "cap": 5.0
   },
   "actions": {
     "adventure": {
+      "food_cost_min": 1,
+      "food_cost_max": 2,
       "food_min": 2,
       "food_max": 4,
-      "workers_min": 1,
-      "workers_max": 3,
       "seed_chance": 0.35,
       "health": -2,
       "seed_pool": ["grain_rich", "resin", "venom", "heal_fungus"]
@@ -35,11 +23,11 @@
       "health": 18
     },
     "expand": {
-      "exp_threshold": [0, 0, 25, 35]
+      "exp_threshold": [0, 20, 30]
     }
   },
   "nest": {
-    "max_level": 4,
+    "max_level": 3,
     "fertile_per_ring": 3
   },
   "army": {
@@ -51,13 +39,14 @@
     "refresh_cost": 3,
     "candidates": 3,
     "tier_rates": {
-      "2": [[1, 100]],
-      "3": [[1, 60], [2, 40]],
-      "4": [[1, 45], [2, 35], [3, 20]]
+      "1": [[1, 100]],
+      "2": [[1, 60], [2, 40]],
+      "3": [[1, 45], [2, 35], [3, 20]]
     }
   },
   "combat": {
     "defeat_health": 10,
+    "verdict_round": 6,
     "rewards": {
       "sand": { "food": [2, 4], "warfruits": 0.5, "amber": 0.0 },
       "resin": { "food": [2, 4], "warfruits": 0.5, "amber": 0.0 },
@@ -66,9 +55,9 @@
     }
   },
   "spring": {
-    "seed_food_bonus": 1,
-    "enemy_mult": 1.1,
-    "explore_worker_extra": 1
+    "production_bonus": 1,
+    "enemy_scale": 1.1,
+    "explore_food_loss": 1
   },
   "weather": {
     "names": { "clear": "晴", "rain": "雨", "cloudy": "多云" },
@@ -79,8 +68,8 @@
       { "clear": 2, "rain": 3, "cloudy": 5 }
     ],
     "effects": {
-      "clear": { "adventure_food": 1 },
-      "rain": { "adventure_workers": 1, "adventure_health": -1, "supply_mult": 1.5 },
+      "clear": { "production_bonus": 1 },
+      "rain": { "explore_food_loss": 1, "adventure_health": -1 },
       "cloudy": {}
     }
   },
