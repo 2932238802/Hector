@@ -9,6 +9,7 @@ enum Phase { ACTION, GROUP_SELECT, EVENT, DEPLOY, BATTLE, RECRUIT, GAME_OVER, WO
 
 const EventPoolScript := preload("res://scripts/core/event_pool.gd")
 const HexGridScript := preload("res://scripts/core/hex_grid.gd")
+const DataStoreScript := preload("res://scripts/core/data_store.gd")
 
 const TOTAL_TURNS := 6
 const TURNS_PER_SEASON := 6
@@ -60,17 +61,33 @@ var battle_count := 0
 var win_count := 0
 var lose_count := 0
 var observed_forecast := false
+var data_version := 0
 var logs: Array[String] = []
 
 
 func _init(p_seed: int = 0) -> void:
-	balance = _load_json("res://data/balance.json")
-	event_data = _load_json("res://data/events.json")
-	event_templates_data = _load_json("res://data/event_templates.json")
-	units_data = _load_json("res://data/units.json")
-	enemies_data = _load_json("res://data/enemies.json")
-	seeds_data = _load_json("res://data/seeds.json")
+	_apply_store(DataStoreScript.instance())
 	start_new_game(p_seed)
+
+
+## 热更：从唯一数据入口重新取数；战斗中不改场上单位（保持开战快照）。
+func reload_data() -> void:
+	var store = DataStoreScript.instance()
+	if store.version == data_version:
+		return
+	_apply_store(store)
+	_add_log("数据已热更（v%d）；战斗数值从下一场生效。" % data_version)
+	changed.emit()
+
+
+func _apply_store(store) -> void:
+	data_version = store.version
+	balance = store.get_data("balance")
+	event_data = store.get_data("events")
+	event_templates_data = store.get_data("event_templates")
+	units_data = store.get_data("units")
+	enemies_data = store.get_data("enemies")
+	seeds_data = store.get_data("seeds")
 
 
 func start_new_game(p_seed: int = 0) -> void:
@@ -469,6 +486,7 @@ func start_battle() -> bool:
 		"enemies": {"front": enemies_front, "back": enemies_back},
 		"round": 1,
 		"event": pending_event,
+		"rewards": balance.get("combat", {}).get("rewards", {}).duplicate(true),
 		"result": "",
 	}
 	battle_count += 1
@@ -726,7 +744,9 @@ func _finish_battle(victory: bool, ruling: bool = false) -> void:
 
 
 func _grant_battle_rewards(tier: String, ruling: bool) -> void:
-	var cfg: Dictionary = balance.get("combat", {}).get("rewards", {}).get(tier, {})
+	# 用开战快照里的奖励表，战斗中途热更不影响本场结算。
+	var rewards: Dictionary = battle.get("rewards", {})
+	var cfg: Dictionary = rewards.get(tier, {})
 	if cfg.is_empty():
 		return
 	var food_range: Array = cfg.get("food", [0, 0])
@@ -1372,6 +1392,7 @@ func _add_log(text: String) -> void:
 
 
 func _load_json(path: String) -> Dictionary:
+	# 保留给旧调用；所有正式读盘走 DataStore。
 	var text := FileAccess.get_file_as_string(path)
 	if text.is_empty():
 		push_error("无法读取数据文件：%s" % path)
@@ -1379,10 +1400,6 @@ func _load_json(path: String) -> Dictionary:
 	var parsed = JSON.parse_string(text)
 	if typeof(parsed) != TYPE_DICTIONARY:
 		push_error("数据文件不是 JSON 对象：%s" % path)
-		return {}
-	# data-contract v1：顶层必须含 schema_version: 1。
-	if int(parsed.get("schema_version", 0)) != 1:
-		push_error("数据文件缺少或非法 schema_version（应为 1）：%s" % path)
 		return {}
 	return parsed
 

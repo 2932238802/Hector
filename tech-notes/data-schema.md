@@ -257,6 +257,8 @@ unit = { "name", "hp", "max_hp", "atk", "ap", "max_ap", "shield", "weaken", "row
 
 ## 7. 校验与演进
 
+- 运行期**唯一读盘入口**是 `scripts/core/data_store.gd`（`DataStore`）：加载、`schema_version` 校验、
+  版本号、`data_reloaded`、错误保留都在这里；新系统不得自己读 `data/`。
 - 当前**没有**外部 schema 校验器；字段缺失靠 `Dictionary.get()` 默认值兜底。
 - 加字段时：先改本文件 → 再改 `data/*.json` → 最后改 `GameState`。
 - 后续新增（系统拍板后再建表）：`relics.json`（虫珀）、`talents.json`（天赋）、

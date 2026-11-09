@@ -4,6 +4,7 @@ extends SceneTree
 
 const GameStateScript := preload("res://scripts/core/game_state.gd")
 const HexGridScript := preload("res://scripts/core/hex_grid.gd")
+const DataStoreScript := preload("res://scripts/core/data_store.gd")
 
 var failures := 0
 
@@ -28,6 +29,7 @@ func _initialize() -> void:
 	_test_recruit()
 	_test_recruit_tiers()
 	_test_unit_pool()
+	_test_data_store()
 	_test_full_run()
 
 	if failures == 0:
@@ -520,6 +522,40 @@ func _test_unit_pool() -> void:
 	check(counts[2] == 8, "tier 2 has 8 units (3 shared + 5 exclusive)")
 	check(counts[3] == 4, "tier 3 has 4 units (1 shared + 3 exclusive)")
 	check(game.unit_info("tunzu").get("name", "") == "囤卒", "exclusive unit is present")
+
+
+func _test_data_store() -> void:
+	var store = DataStoreScript.instance()
+	check(store.version > 0, "DataStore loads initial data")
+	for name in ["balance", "events", "event_templates", "units", "enemies", "seeds"]:
+		check(not store.get_data(name).is_empty(), "DataStore has " + name)
+
+	var before: int = store.version
+	var good := JSON.stringify({"schema_version": 1, "max_health": 101, "start": {"health": 100, "food": 15}})
+	check(store.apply_text("balance", good), "valid hot-reload text applies")
+	check(int(store.get_data("balance").get("max_health", 0)) == 101, "hot-reload value visible")
+	check(store.version == before + 1, "version increments once")
+
+	var applied: int = store.version
+	check(not store.apply_text("balance", "{ broken json"), "invalid JSON rejected")
+	check(store.version == applied, "version unchanged on invalid data")
+	check(int(store.get_data("balance").get("max_health", 0)) == 101, "old data kept on invalid JSON")
+	check(not store.last_error.is_empty(), "invalid data records an error")
+	check(store.apply_text("balance", good), "good text re-applies after a bad save")
+	check(store.apply_text("balance", good) == false, "same text is not re-applied")
+
+	store.reload_all()
+	check(int(store.get_data("balance").get("max_health", 0)) == 100, "real data restored")
+	check(store.last_error.is_empty(), "error clears after a good load")
+
+	var live = GameStateScript.new(555)
+	var live_good := JSON.stringify({"schema_version": 1, "max_health": 130, "start": {"health": 100, "food": 15}})
+	store.apply_text("balance", live_good)
+	live.reload_data()
+	check(live.max_health() == 130.0, "GameState picks up hot-reloaded balance")
+	store.reload_all()
+	live.reload_data()
+	check(live.max_health() == 100.0, "GameState restores real balance")
 
 
 func _test_full_run() -> void:

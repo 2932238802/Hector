@@ -3,6 +3,7 @@ extends Control
 ## M0 范围：巢穴视图 + HUD + 三选一 + 事件组选择 + 事件结算 + 日志。
 
 const GameStateScript := preload("res://scripts/core/game_state.gd")
+const DataStoreScript := preload("res://scripts/core/data_store.gd")
 const EventPoolScript := preload("res://scripts/core/event_pool.gd")
 const NestViewScript := preload("res://scripts/ui/nest_view.gd")
 
@@ -20,14 +21,41 @@ var resources_label: Label
 var army_label: Label
 var health_label: Label
 var health_bar: ProgressBar
+var data_warning: Label
 
 
 func _ready() -> void:
 	_build_theme()
 	_build_ui()
 	_start_game(0)
+	var store = DataStoreScript.instance()
+	store.data_reloaded.connect(_on_data_reloaded)
+	_update_data_warning()
 	_maybe_demo()
 	_maybe_capture()
+
+
+func _process(delta: float) -> void:
+	DataStoreScript.instance().poll(delta)
+	_update_data_warning()
+
+
+func _on_data_reloaded(_version: int) -> void:
+	if game != null:
+		game.reload_data()
+	_update_data_warning()
+
+
+func _update_data_warning() -> void:
+	if data_warning == null:
+		return
+	var store = DataStoreScript.instance()
+	if store.last_error.is_empty():
+		data_warning.visible = false
+		data_warning.text = ""
+		return
+	data_warning.visible = true
+	data_warning.text = "⚠ 数据未生效（保留旧版本）：%s" % store.last_error
 
 
 ## 开发用：-- --demo-event / --demo-deploy / --demo-battle / --demo-recruit 直达对应界面。
@@ -248,6 +276,15 @@ func _build_side_panel() -> Control:
 func _build_log_panel() -> Control:
 	var panel := _panel()
 	panel.custom_minimum_size = Vector2(0, 128)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	panel.add_child(box)
+	data_warning = Label.new()
+	data_warning.visible = false
+	data_warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	data_warning.add_theme_color_override("font_color", Color("a33a2a"))
+	data_warning.add_theme_font_size_override("font_size", 13)
+	box.add_child(data_warning)
 	log_label = RichTextLabel.new()
 	log_label.fit_content = false
 	log_label.scroll_following = true
@@ -255,7 +292,7 @@ func _build_log_panel() -> Control:
 	log_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	log_label.add_theme_color_override("default_color", INK)
 	log_label.add_theme_font_size_override("normal_font_size", 14)
-	panel.add_child(log_label)
+	box.add_child(log_label)
 	return panel
 
 
