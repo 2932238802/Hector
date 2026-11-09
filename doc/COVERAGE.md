@@ -64,8 +64,10 @@ last-review: 2026-11-09
 | 种子条目 / 产出 | `03-content/seeds.md` | draft | 食物 / 战果 / 工具；战果为法术卡式战斗道具（加属性 / 挂 buff）；工具含恢复、增益、相邻羁绊、可被攻击的战斗植物；首批 3 种植物已确认；植物无通用存活奖励，仅条目自带特性才有 |
 | 天赋树 | `03-content/talent-trees.md` | deprecated | **2026-11-09 暂缓，不作为 v1 系统**；虫种模板已移除天赋树 |
 | 势力 / 中立生物 | `03-content/factions.md` | draft | 中立 / 弱 / 强；敌对基本不可避免 |
+| 敌人 | `03-content/enemies.md` | draft | 与兵种完全对称；族群分类（甲虫 / 蜘蛛 / 鸟）；强敌 = 数值 + 独特机制；春季 4 个一阶（盾甲 / 锹甲 / 结网蛛 / 掠食雀），前两场每场 2 个（Q-122） |
+| 战果 | `03-content/results.md` | draft | 从 units.md 拆出：法术卡式战斗道具；来源（种子 / 战斗奖励 / 兵种绑定）、使用时机、不占行动点、可叠加；效果与容量待定（Q-072 / Q-074） |
 | 虫珀 | `03-content/relics.md` | draft | 普通 / 诅咒虫珀；遗迹基础掉落 + 概率诅咒 |
-| 敌人与 Boss 数值表 | `03-content/enemies.md` | — | 未建 |
+| 敌人与 Boss 数值表 | `03-content/enemies.md` | draft | 一阶敌人已出提案；Boss / 二阶三阶敌人未建 |
 | 建筑 / 设施 / 道具 | `03-content/structures-items.md` | — | 未建 |
 | 事件文本 | `03-content/events-text.md` | — | 未建 |
 
@@ -116,7 +118,15 @@ last-review: 2026-11-09
 | 资产来源登记 | `09-legal/asset-register.md` | — | 未建 |
 | 设计决策记录（ADR） | `09-legal/decision-log.md` | — | 未建 |
 
----
+## J. 切片与交接
+
+| 项 | 文档 | 状态 | 备注 |
+|---|---|---|---|
+| 春季垂直切片 | `04-slice/spring-v0.md` | draft | 第一个大回合 = 春季 6 回合 / 24 次事件 + 一阶兵种；开局 L2 / 15 食物 / 2 次免费招募；春季敌人 4 种、事件池 13 个；验收标准 7 条；夏 / 秋 / 冬与二阶三阶挂起 |
+| 设计与实现边界 | `05-handoff/boundary.md` | living | 设计层只写 doc/；代码 / 数据 / 工程由实现层负责；歧义登记 OPEN-QUESTIONS |
+| 数据契约 | `05-handoff/data-contract.md` | living | `data/*.json` 文件划分、字段、枚举、校验规则 |
+| 网页调参工具需求 | `05-handoff/tuning-tool.md` | living | 表格编辑 + 校验 + 预算预览 + 版本接口；开发实现 |
+| Godot 热更需求 | `05-handoff/hot-reload.md` | living | 战斗数值下一场生效、其余即时；1 秒内检测；开发实现 |
 
 ## 完备性判定
 

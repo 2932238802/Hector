@@ -84,10 +84,20 @@ doc/
 │   ├── ant-types.md               # 虫种/兵种总览（living）
 │   ├── species.md                 # 虫种（英雄层）
 │   ├── units.md                   # 兵种（收集层）
+│   ├── enemies.md                 # 敌人（族群 / 强敌 / 春季 4 个）
 │   ├── seeds.md                   # 种子（食物 / 战果 / 工具）
 │   ├── talent-trees.md            # 天赋树（暂缓 / deprecated）
 │   ├── factions.md                # 势力与中立生物
-│   └── relics.md                  # 虫珀
+│   ├── relics.md                  # 虫珀
+│   └── results.md                 # 战果（战斗道具层）
+├── 04-slice/
+│   └── spring-v0.md               # 春季垂直切片：6 回合 / 一阶
+├── 05-handoff/                    # 设计 → 开发 的交接层（不是设计内容）
+│   ├── README.md                  # 交接目录索引
+│   ├── boundary.md                # 设计层 / 实现层职责边界
+│   ├── data-contract.md           # data/*.json 字段与校验
+│   ├── tuning-tool.md             # 网页调参工具需求
+│   └── hot-reload.md              # Godot 热更需求
 └── （待建）
     ├── 04-narrative/              # 世界观、角色、文案
     ├── 05-art/                    # 美术方向、色板、UI
@@ -122,11 +132,19 @@ doc/
 | `02-systems/combat-math.md` | draft | 数值底座 v0：只有数值（HP / 攻击 / 行动点 / 护盾）与状态（削弱 = 攻击 ×50%），没有减伤；伤害 = 攻击值 × 倍率 × 0.9–1.1；敌人三阶分档；目标 3–4 轮、第 6 轮裁决；战后 HP 一律回满 |
 | `03-content/ant-types.md` | living | 虫种/兵种总览 |
 | `03-content/species.md` | draft | 虫种；首个虫种「廪实」设计中（1 被动劝农 + 2 主动开仓 / 守廪；三条构筑积廪 / 劝农 / 守廪；默认开局、共享池均衡；所有虫种上手难度统一为中等；专属兵种 12 = 一阶 4 / 二阶 5 / 三阶 3，已出提案：囤卒 / 拾卒 / 拒卒 / 禾卒 / 廪尉 / 障卒 / 田正 / 釜卒 / 殉卒 / 太仓 / 镇廪 / 实卒）；其余旧候选待重做 |
+| `03-content/enemies.md` | draft | 敌人：与兵种完全对称；按族群（甲虫 / 蜘蛛 / 鸟）分类；强敌 = 数值更高 + 独特机制；春季 4 个一阶（盾甲 / 锹甲 / 结网蛛 / 掠食雀） |
 | `03-content/units.md` | draft | 兵种 + 食物为主招募（事件触发）+ 战斗补给 1–2/场 + 战果；兵种名两字、不带“蚁”；每个兵种 1 个签名特性；每虫种 24 = 共享 12 + 专属 12；阶级 = 一阶 / 二阶 / 三阶（巢穴 L2 / L3 / L4，非数值升阶）；累计 12 / 20 / 24；出现率 L2 100% / L3 60:40 / L4 45:35:20；升阶保底；共享 12 名单已排定（一阶 8 / 二阶 3 / 三阶 1）；已定稿「锐士」「斥候」「采薇」「干城」「焚卒」「弩手」，辅兵已定签名（庇护）；缚者与第 9–12 个为提案条目（Q-118 / Q-119 / Q-109） |
 | `03-content/seeds.md` | draft | 种子条目：食物 / 战果 / 工具（恢复、增益、相邻羁绊待重议、可被攻击的战斗植物） |
 | `03-content/talent-trees.md` | deprecated | 天赋树（2026-11-09 暂缓，不作为 v1 系统） |
 | `03-content/factions.md` | draft | 中立 / 弱小 / 强大 |
 | `03-content/relics.md` | draft | 虫珀 |
+| `03-content/results.md` | draft | 战果：法术卡式战斗道具，来源 / 使用 / 叠加规则 |
+| `04-slice/spring-v0.md` | draft | **春季垂直切片 v0**：开局 / 6 回合 / 一阶敌人与事件 / 验收标准 |
+| `05-handoff/README.md` | living | 交接层索引：给开发 Agent 的阅读顺序与交付顺序 |
+| `05-handoff/boundary.md` | living | 设计层（规则 / 数值 / 文档）与实现层（代码 / 工具 / 工程）的边界与变更流程 |
+| `05-handoff/data-contract.md` | living | `data/*.json` 文件划分、字段、枚举、校验规则 |
+| `05-handoff/tuning-tool.md` | living | 网页调参工具的功能、接口与验收标准（开发实现） |
+| `05-handoff/hot-reload.md` | living | Godot 热更：生效时机、行为契约、验收标准（开发实现） |
 
 > 新文档建立后，必须在这里补一行。
 
