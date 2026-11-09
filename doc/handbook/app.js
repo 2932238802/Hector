@@ -55,9 +55,15 @@
 
   function renderUnits() {
     var cards = D.units.map(function (u) {
+      var plays = (u.plays || []);
+      var playTags = plays.length
+        ? '<div class="playtags"><span class="pt-label">玩法</span>' +
+          plays.map(function (t) { return '<span class="chip play">' + esc(t) + "</span>"; }).join("") +
+          "</div>"
+        : "";
       return (
         '<article class="card" data-search="' +
-        esc(searchKey([u.name, u.source, u.row, u.sig, u.text, u.note,
+        esc(searchKey([u.name, u.source, u.row, u.sig, u.text, u.note, plays.join(" "),
           "兵种", TIER_NAME[u.tier], "L" + u.tier])) +
         '" data-tier="' + u.tier + '" data-src="' + esc(u.source) + '">' +
           '<div class="card-head">' +
@@ -77,6 +83,7 @@
           "</dl>" +
           '<div class="signature"><span class="sig-name">' + esc(u.sig) +
             '</span><span class="sig-text">' + esc(u.text) + "</span></div>" +
+          playTags +
           (u.note ? '<p class="note">' + esc(u.note) + "</p>" : "") +
         "</article>"
       );
@@ -111,6 +118,7 @@
         '<div class="sec-head">' +
           "<h2>兵种</h2>" +
           "<p>每虫种 24 个 = 共享 12 + 专属 12。春季切片先做一阶；一阶 12 个（共享 8 + 廪实专属 4）已全部出条目，二阶 / 三阶多为提案。战斗内所有单位基础 1 行动点，战后 HP 回满。</p>" +
+          "<p><b>阶级分工：</b>一阶 = 成长位，很多是未来的大哥，早期培养不亏；二阶 / 三阶 = 机制位，补新打法，不做一阶的加强版。</p>" +
           '<div class="counts">' +
             '<span class="count-pill">共 <b>' + D.units.length + "</b> 个</span>" +
             '<span class="count-pill">已定 <b>' + ok + "</b></span>" +
@@ -190,20 +198,72 @@
         );
       }).join("");
 
-      var builds = s.builds.map(function (b) {
-        return "<li>" + esc(b) + "</li>";
-      }).join("");
+      var buildHtml = "";
+      if (s.buildsDetail) {
+        var bd = s.buildsDetail;
+        var bcards = bd.builds.map(function (b) {
+          var rows = b.roles.map(function (r) {
+            return '<div class="build-role">' +
+              '<span class="br">' + esc(r.role) + "</span>" +
+              '<span class="bu">' + esc(r.unit) + "</span>" +
+              '<span class="ba">' + esc(r.act) + "</span>" +
+            "</div>";
+          }).join("");
+          return '<div class="build-card">' +
+            '<div class="build-head"><span class="bn">' + esc(b.name) + "</span>" +
+              '<span class="bq">' + esc(b.question) + "</span></div>" +
+            '<div class="build-roles">' + rows + "</div>" +
+            (b.note ? '<p class="build-note">' + esc(b.note) + "</p>" : "") +
+            (b.out ? '<p class="build-note out">' + esc(b.out) + "</p>" : "") +
+          "</div>";
+        }).join("");
+        var bdTiers = (bd.tiers || []).map(function (t) {
+          return '<div class="build-tier"><span class="tt">' + esc(t.name) +
+            '</span><span class="tu">' + esc(t.units) + "</span></div>";
+        }).join("");
+        buildHtml = '<div class="block"><h4>流派骨架（提案）</h4>' +
+          '<div class="build-grid">' + bcards + "</div>" +
+          '<h5 class="play-sub">12 个的落位</h5>' +
+          '<div class="build-tiers">' + bdTiers + "</div>" +
+          (bd.note ? '<p class="build-note">' + esc(bd.note) + "</p>" : "") +
+          (bd.pending ? '<p class="build-pending">' + esc(bd.pending) + "</p>" : "") +
+          "</div>";
+      }
+
+      var playHtml = "";
+      if (s.play) {
+        var phases = (s.play.phases || []).map(function (p) {
+          return '<div class="play-phase"><span class="pn">' + esc(p.name) +
+            '</span><span class="pt">' + esc(p.text) + "</span></div>";
+        }).join("");
+        var combos = (s.play.combos || []).map(function (c) {
+          return "<li>" + esc(c) + "</li>";
+        }).join("");
+        var mistakes = (s.play.mistakes || []).map(function (m) {
+          return "<li>" + esc(m) + "</li>";
+        }).join("");
+        playHtml = '<div class="block"><h4>玩法（草稿 · 兵种定稿后重写）</h4>' +
+          '<p class="play-pitch">' + esc(s.play.pitch) + "</p>" +
+          '<div class="play-phases">' + phases + "</div>" +
+          (combos ? '<h5 class="play-sub">核心连招</h5><ul class="play-list">' + combos + "</ul>" : "") +
+          (mistakes ? '<h5 class="play-sub">常见失误</h5><ul class="play-list bad">' + mistakes + "</ul>" : "") +
+          "</div>";
+      }
 
       return (
         '<article class="card species-card" data-search="' +
-        esc(searchKey([s.name, s.theme, s.passive, s.actives.map(function (a) { return a.name + a.text; }).join(" "), s.builds.join(" "), s.extra, "虫种 种族"])) +
+        esc(searchKey([s.name, s.theme, s.passive, s.actives.map(function (a) { return a.name + a.text; }).join(" "), s.extra,
+          s.buildsDetail ? [s.buildsDetail.builds.map(function (b) { return b.name + b.question + b.note + (b.out || "") + b.roles.map(function (r) { return r.role + r.unit + r.act; }).join(" "); }).join(" "), s.buildsDetail.tiers.map(function (t) { return t.name + t.units; }).join(" ")].join(" ") : "",
+          s.play ? [s.play.pitch].concat(s.play.phases.map(function (p) { return p.name + p.text; }), (s.play.combos || []), (s.play.mistakes || [])).join(" ") : "",
+          "虫种 种族 玩法 流派 骨架 积廪 劝农 守廪"])) +
         '">' +
           '<div class="card-head"><h3>' + esc(s.name) + "</h3>" +
             '<span class="spacer"></span>' + badge(s.status) + "</div>" +
           '<p class="theme">' + esc(s.theme) + "</p>" +
           '<div class="block"><h4>被动</h4><div class="passive">' + esc(s.passive) + "</div></div>" +
           '<div class="block"><h4>主动技能</h4><div class="actives">' + actives + "</div></div>" +
-          '<div class="block"><h4>三条流派</h4><ul class="builds">' + builds + "</ul></div>" +
+          buildHtml +
+          playHtml +
           '<p class="meta-line">' + esc(s.extra) + "</p>" +
         "</article>"
       );
@@ -378,7 +438,7 @@
       '<section class="sec" id="numbers" data-sec>' +
         '<div class="sec-head">' +
           "<h2>核心数值</h2>" +
-          "<p>战斗结算只改「攻击值 → 伤害 → 护盾 → HP」四个环节，没有隐藏的减伤层。</p>" +
+          "<p>战斗结算只改「攻击值 → 伤害 → 护盾 → HP」四个环节，没有隐藏的减伤层。<b>护盾只能在战斗内获得</b>：布阵阶段 / 战斗外不能预先加，也不跨战斗保留。</p>" +
         "</div>" +
         '<div class="formula-table">' + rows + "</div>" +
       "</section>"
@@ -551,19 +611,33 @@
     showPage(PAGE_IDS[idx], { push: true });
   }
 
-  prevBtn.addEventListener("click", function () { go(-1); });
-  nextBtn.addEventListener("click", function () { go(1); });
+  // 点标签 / 页码 = 明确要看这一页：先清掉搜索词，
+  // 否则上一页留下的搜索会把这一页的条目全部藏起来（看起来像“一个都没有”）
+  function navTo(id) {
+    if (search.value) search.value = "";
+    showPage(id, { push: true });
+    applyAll();
+  }
+
+  function pageStep(step) {
+    var idx = PAGE_IDS.indexOf(currentId) + step;
+    if (idx < 0 || idx >= PAGE_IDS.length) return;
+    navTo(PAGE_IDS[idx]);
+  }
+
+  prevBtn.addEventListener("click", function () { pageStep(-1); });
+  nextBtn.addEventListener("click", function () { pageStep(1); });
 
   tabEls.forEach(function (a) {
     a.addEventListener("click", function (e) {
       e.preventDefault();
-      showPage(a.getAttribute("data-id"), { push: true });
+      navTo(a.getAttribute("data-id"));
     });
   });
 
   numEls.forEach(function (b) {
     b.addEventListener("click", function () {
-      showPage(b.getAttribute("data-id"), { push: true });
+      navTo(b.getAttribute("data-id"));
     });
   });
 
@@ -658,10 +732,15 @@
       filterCount.classList.toggle("on", filtersActive());
     }
 
-    // 当前页没有命中时，自动跳到第一个有命中的页
-    if (active && total > 0 && pageCount(currentId) === 0) {
-      var first = PAGES.filter(function (p) { return pageCount(p.id) > 0; })[0];
-      if (first) showPage(first.id, { push: false });
+    // 当前页没有命中：搜索时跳到第一个有命中的页；只有筛选时留在本页给提示
+    if (active && pageCount(currentId) === 0) {
+      if (q && total > 0) {
+        var first = PAGES.filter(function (p) { return pageCount(p.id) > 0; })[0];
+        if (first) showPage(first.id, { push: false });
+      } else if (total > 0) {
+        emptyEl.textContent = "本页没有可显示的条目（当前的筛选只作用于兵种页）";
+        emptyEl.classList.remove("hidden");
+      }
     }
 
     syncUrl();

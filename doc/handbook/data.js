@@ -15,82 +15,82 @@ window.HANDBOOK = {
   // ── 兵种（一阶 12 个）──────────────────────────────
   units: [
     // 共享 · 一阶（已定稿）
-    { name: "锐士", tier: 1, kind: "shared", source: "共享", cost: 8, hp: 10.0, atk: 3.0, row: "前排",
+    { name: "锐士", tier: 1, kind: "shared", source: "共享", plays: ["前排输出", "滚雪球"], cost: 8, hp: 10.0, atk: 3.0, row: "前排",
       sig: "成长", text: "每次攻击后永久 +0.2 攻击", status: "已定",
       note: "起步偏慢，靠攻击次数滚雪球；不增加生命。" },
-    { name: "斥候", tier: 1, kind: "shared", source: "共享", cost: 5, hp: 7.0, atk: 2.0, row: "前排（推荐）",
+    { name: "斥候", tier: 1, kind: "shared", source: "共享", plays: ["战果流", "卖死"], cost: 5, hp: 7.0, atk: 2.0, row: "前排（推荐）",
       sig: "迅捷 / 不甘", text: "开局得【迅捷】、阵亡得【不甘】两个战果", status: "已定",
       note: "低血低攻，推荐放前排主动卖死触发不甘。" },
-    { name: "采薇", tier: 1, kind: "shared", source: "共享", cost: 6, hp: 6.0, atk: 1.5, row: "后排（推定）",
+    { name: "采薇", tier: 1, kind: "shared", source: "共享", plays: ["经济", "后排收益"], cost: 6, hp: 6.0, atk: 1.5, row: "后排（推定）",
       sig: "采撷", text: "胜利或存活，额外 +1–3 食物", status: "已定",
       note: "站位文档未明确写过，本页按后排推定，待确认。" },
-    { name: "干城", tier: 1, kind: "shared", source: "共享", cost: 9, hp: 16.0, atk: 1.0, row: "前排",
+    { name: "干城", tier: 1, kind: "shared", source: "共享", plays: ["承伤", "保护后排"], cost: 9, hp: 16.0, atk: 1.0, row: "前排",
       sig: "扼守 + 格挡 + 受伤成长", text: "每轮 3.0 护盾；每次实际掉血永久 +1 最大生命", status: "已定",
       note: "嘲讽位，把单体攻击吸到自己身上；攻击 1.0，纯耐久。" },
-    { name: "焚卒", tier: 1, kind: "shared", source: "共享", cost: 6, hp: 8.0, atk: 2.0, row: "前排",
+    { name: "焚卒", tier: 1, kind: "shared", source: "共享", plays: ["阵亡流", "群体伤害"], cost: 6, hp: 8.0, atk: 2.0, row: "前排",
       sig: "不甘（阵亡爆炸）", text: "只能被击杀触发：对敌方前排每单位造成攻击力 ×50%，全灭后继续打后排", status: "已定",
       note: "没有主动引爆，触发不可控；爆炸每目标 1.0；战后返场并回满 HP。" },
-    { name: "弩手", tier: 1, kind: "shared", source: "共享", cost: 7, hp: 6.0, atk: 3.0, row: "后排",
+    { name: "弩手", tier: 1, kind: "shared", source: "共享", plays: ["爆发输出", "多段攻击"], cost: 7, hp: 6.0, atk: 3.0, row: "后排",
       sig: "连射", text: "每次攻击 30% 获得 +1 行动点，可连锁", status: "已定",
       note: "期望 1.43 次攻击/轮；额外行动点只给自己。" },
-    { name: "辅兵", tier: 1, kind: "shared", source: "共享", cost: 7, hp: 7.0, atk: 2.0, row: "后排",
+    { name: "辅兵", tier: 1, kind: "shared", source: "共享", plays: ["护盾支援", "续航"], cost: 7, hp: 7.0, atk: 2.0, row: "后排",
       sig: "庇护", text: "每轮玩家阶段开始，随机 1 名友军获得 1 层护盾（5 点）", status: "已定",
       note: "随机不可控；层数是否叠加、是否每轮清零、是否含自己仍待定。" },
-    { name: "缚者", tier: 1, kind: "shared", source: "共享", cost: 8, hp: 6.0, atk: 1.5, row: "后排",
+    { name: "缚者", tier: 1, kind: "shared", source: "共享", plays: ["控场", "削攻"], cost: 8, hp: 6.0, atk: 1.5, row: "后排",
       sig: "缠缚", text: "每轮开始选 1 个敌人施加【削弱】：攻击 ×50%，叠层只延长持续时间（每轮 −1 层）", status: "已定",
       note: "输出极低，只能控 1 人；对不攻击的单位无效。" },
 
     // 共享 · 二阶 / 三阶（提案）
-    { name: "传令", tier: 2, kind: "shared", source: "共享", cost: 10, hp: 11.0, atk: 2.0, row: "后排",
+    { name: "传令", tier: 2, kind: "shared", source: "共享", plays: ["行动点支援", "爆发回合"], cost: 10, hp: 11.0, atk: 2.0, row: "后排",
       sig: "传令", text: "每场 1 次，令 1 名友军本轮 +1 行动点", status: "提案",
       note: "一场一次；给不到多段输出单位就浪费。" },
-    { name: "悍卒", tier: 2, kind: "shared", source: "共享", cost: 10, hp: 15.0, atk: 2.5, row: "前排",
+    { name: "悍卒", tier: 2, kind: "shared", source: "共享", plays: ["前排输出", "受伤成长"], cost: 10, hp: 15.0, atk: 2.5, row: "前排",
       sig: "悍勇", text: "每轮首次实际掉血后，本场攻击永久 +1.0", status: "提案",
       note: "不能和干城同排：扼守会把攻击吸走。" },
-    { name: "队正", tier: 2, kind: "shared", source: "共享", cost: 11, hp: 13.0, atk: 2.0, row: "后排",
+    { name: "队正", tier: 2, kind: "shared", source: "共享", plays: ["阵型支援", "后排护盾"], cost: 11, hp: 13.0, atk: 2.0, row: "后排",
       sig: "整阵", text: "存活时，同排友军每轮玩家阶段开始获得 1.0 护盾", status: "提案",
       note: "只护同排；站前排又挤。" },
-    { name: "司天", tier: 3, kind: "shared", source: "共享", cost: 14, hp: 12.0, atk: 3.0, row: "后排",
+    { name: "司天", tier: 3, kind: "shared", source: "共享", plays: ["环境", "待重做"], cost: 14, hp: 12.0, atk: 3.0, row: "后排",
       sig: "观天", text: "布阵阶段把本场天气改为晴 / 多云 / 雨任一，每场 1 次", status: "提案",
       note: "天气双方共享；天气本来就合适时等于白板。" },
 
     // 廪实专属 · 一阶（提案）
-    { name: "囤卒", tier: 1, kind: "species", source: "廪实专属", cost: 9, hp: 10.0, atk: 2.5, row: "前排",
+    { name: "仓士", tier: 1, kind: "species", source: "廪实专属", plays: ["积廪", "战外成长"], cost: 9, hp: 10.0, atk: 2.5, row: "前排",
       sig: "积粮", text: "战斗外每个回合 1 次：交 2 食物，永久 +4 生命（同时回 4）或 +2 攻击", status: "提案",
       note: "本局永久、可叠加、无上限；成长慢，前期吃经济；与实卒的囤粮方向相反。" },
-    { name: "拾卒", tier: 1, kind: "species", source: "廪实专属", cost: 8, hp: 9.0, atk: 2.0, row: "前排",
+    { name: "饷者", tier: 1, kind: "species", source: "廪实专属", plays: ["积廪", "长期收益"], cost: 8, hp: 9.0, atk: 2.0, row: "前排",
       sig: "拾遗", text: "每场战斗开始：自身永久 −2.0 最大生命，随机 1 名友军永久 +1.0 最大生命，得 2–3 食物", status: "提案",
       note: "最大生命不足 2.0 时整条不触发；9.0 起可触发 4 次，之后白板。" },
-    { name: "拒卒", tier: 1, kind: "species", source: "廪实专属", cost: 8, hp: 11.0, atk: 2.0, row: "前排",
-      sig: "立壁", text: "战斗开始时获得 3.0 护盾，一次性、不刷新", status: "提案",
-      note: "第二轮起是白板，与干城功能有交集。" },
-    { name: "禾卒", tier: 1, kind: "species", source: "廪实专属", cost: 7, hp: 7.0, atk: 1.5, row: "后排",
+    { name: "垒卒", tier: 1, kind: "species", source: "廪实专属", plays: ["守廪", "巢穴回复"], cost: 8, hp: 11.0, atk: 2.0, row: "前排",
+      sig: "先手", text: "每场战斗开始时，恢复巢穴完整度 2 点", status: "提案",
+      note: "先手结算，早于其它开场效果；只在上阵时触发，不超过上限。" },
+    { name: "圃师", tier: 1, kind: "species", source: "廪实专属", plays: ["劝农", "强化植物"], cost: 7, hp: 7.0, atk: 1.5, row: "后排",
       sig: "护苗", text: "每株存活的己方战斗植物，全体友军 +0.5 攻击（上限 +2.0）", status: "提案",
       note: "不带植物就是 1.5 攻击的白板。" },
 
     // 廪实专属 · 二阶 / 三阶（提案）
-    { name: "廪尉", tier: 2, kind: "species", source: "廪实专属", cost: 13, hp: 12.0, atk: 2.0, row: "后排",
+    { name: "廪尉", tier: 2, kind: "species", source: "廪实专属", plays: ["积廪", "花粮", "待砍"], cost: 13, hp: 12.0, atk: 2.0, row: "后排",
       sig: "发廪", text: "每场 1 次，交 3 食物，全队本场 +1.0 攻击", status: "提案",
-      note: "一次性；粮不足不能用。" },
-    { name: "障卒", tier: 2, kind: "species", source: "廪实专属", cost: 13, hp: 17.0, atk: 2.0, row: "前排",
+      note: "流派重排中：与釜卒同一声部，可能砍掉。" },
+    { name: "障卒", tier: 2, kind: "species", source: "廪实专属", plays: ["守廪·护", "替伤"], cost: 13, hp: 17.0, atk: 2.0, row: "前排",
       sig: "屏障", text: "每轮指定 1 名后排友军，替其承受下一次单体攻击（不能替 AOE）", status: "提案",
-      note: "每轮只有 1 次；自己会被打穿。" },
-    { name: "田正", tier: 2, kind: "species", source: "廪实专属", cost: 12, hp: 11.0, atk: 1.5, row: "后排",
+      note: "流派重排中：改为守廪·护（承受的差额记到巢穴完整度）。" },
+    { name: "田正", tier: 2, kind: "species", source: "廪实专属", plays: ["劝农", "保护植物"], cost: 12, hp: 11.0, atk: 1.5, row: "后排",
       sig: "督耕", text: "每轮玩家阶段开始，己方全部战斗植物获得 1.0 护盾", status: "提案",
       note: "无植物白板；1.0 只挡零头。" },
-    { name: "釜卒", tier: 2, kind: "species", source: "廪实专属", cost: 12, hp: 14.0, atk: 2.5, row: "前排",
+    { name: "釜卒", tier: 2, kind: "species", source: "廪实专属", plays: ["积廪", "花粮"], cost: 12, hp: 14.0, atk: 2.5, row: "前排",
       sig: "灶火", text: "每轮可交 1 食物，随机 1 名友军本场 +1.0 攻击（可叠加）", status: "提案",
       note: "每轮烧粮；随机不可控。" },
-    { name: "殉卒", tier: 2, kind: "species", source: "廪实专属", cost: 14, hp: 13.0, atk: 3.0, row: "前排",
+    { name: "殉卒", tier: 2, kind: "species", source: "廪实专属", plays: ["守廪·花", "阵亡触发"], cost: 14, hp: 13.0, atk: 3.0, row: "前排",
       sig: "不甘", text: "阵亡时全队本场 +1.0 攻击（每场 1 次）", status: "提案",
-      note: "要主动送死；与采薇的存活条件相反。" },
-    { name: "太仓", tier: 3, kind: "species", source: "廪实专属", cost: 18, hp: 18.0, atk: 3.0, row: "后排",
+      note: "流派重排中：改为守廪·花（主动扣完整度换战力）。" },
+    { name: "太仓", tier: 3, kind: "species", source: "廪实专属", plays: ["积廪", "花粮爆发", "待砍"], cost: 18, hp: 18.0, atk: 3.0, row: "后排",
       sig: "开廪", text: "每场 1 次，交 5 食物，全队 +2.0 攻击与 2.0 护盾", status: "提案",
-      note: "5 食物门槛高；一场一次。" },
-    { name: "镇廪", tier: 3, kind: "species", source: "廪实专属", cost: 18, hp: 22.0, atk: 2.5, row: "前排",
+      note: "流派重排中：与釜卒同一声部，可能砍掉。" },
+    { name: "镇廪", tier: 3, kind: "species", source: "廪实专属", plays: ["守廪·花", "全队护盾"], cost: 18, hp: 22.0, atk: 2.5, row: "前排",
       sig: "镇仓", text: "存活时，每轮玩家阶段开始全队获得 2.0 护盾", status: "提案",
-      note: "高血嘲讽位；死了断供。" },
-    { name: "实卒", tier: 3, kind: "species", source: "廪实专属", cost: 17, hp: 19.0, atk: 3.0, row: "前排",
+      note: "流派重排中：改为守廪·花（一次性大额爆发）。" },
+    { name: "实卒", tier: 3, kind: "species", source: "廪实专属", plays: ["积廪", "库存即战力"], cost: 17, hp: 19.0, atk: 3.0, row: "前排",
       sig: "实仓", text: "攻击额外 +（当前食物 ÷ 8，向下取整，最高 +3.0）", status: "提案",
       note: "吃库存；与烧粮体系方向相反。" }
   ],
@@ -119,7 +119,63 @@ window.HANDBOOK = {
         { name: "开仓", cd: 6, text: "催熟所有收获型种子，立即产出一次，计数器归零" },
         { name: "守廪", cd: 6, text: "立即恢复最大巢穴完整度的 25%" }
       ],
-      builds: ["积廪：存粮 / 开仓，节奏型爆发", "劝农：扩田 / 加种子 / 缩周期", "守廪：修巢 / 防守植物 / 招募，消耗战"],
+      buildsDetail: {
+        builds: [
+          { name: "积廪", question: "粮是留着还是花掉？",
+            roles: [
+              { role: "战外：粮 → 面板", unit: "仓士", act: "保留" },
+              { role: "战外：面板 → 粮", unit: "饷者", act: "保留" },
+              { role: "战斗中：花粮换爆发", unit: "釜卒", act: "保留" },
+              { role: "战斗中：吃库存换被动", unit: "实卒", act: "保留" }
+            ],
+            note: "仓士 / 饷者 是一对反向镜像；釜卒 / 实卒 是第二对。每回合在「抽干库存换爆发」和「留着吃被动」之间选。",
+            out: "廪尉、太仓 —— 与釜卒同一声部，是重复的来源。" },
+          { name: "劝农", question: "粮从哪来？",
+            roles: [
+              { role: "强田（植物越多我越强）", unit: "圃师", act: "保留" },
+              { role: "保田（植物获得护盾）", unit: "田正", act: "保留" },
+              { role: "产田（增加植物 / 种子）", unit: "—", act: "新增" },
+              { role: "用田（消耗植物换爆发）", unit: "—", act: "新增" }
+            ],
+            note: "闭环是 产田 → 强田 → 保田 → 用田。现在只有中间两项，植物一死整条线就塌。" },
+          { name: "守廪", question: "巢穴的血能不能当资源？",
+            roles: [
+              { role: "护：转嫁（差额记完整度）", unit: "障卒", act: "改造" },
+              { role: "回：先手补巢穴", unit: "垒卒", act: "改造" },
+              { role: "花：燃烧（扣完整度换战力）", unit: "殉卒", act: "改造" },
+              { role: "花：大额（一次性大爆发）", unit: "镇廪", act: "改造" }
+            ],
+            note: "一半护一半花。花派单次消耗必须 ≤ 守廪一次回复（25%），否则是赌死；护派的意义是给花派攒钱，不是单纯做坦。" }
+        ],
+        tiers: [
+          { name: "一阶", units: "仓士 · 饷者 · 圃师 · 垒卒" },
+          { name: "二阶", units: "釜卒 · 田正 · 产田（新） · 障卒 · 殉卒" },
+          { name: "三阶", units: "实卒 · 用田（新） · 镇廪" }
+        ],
+        note: "三条线各 4 个，每阶每条线至少 1 个。共享池已有 干城 / 悍卒 / 队正 兜住通用前排，专属兵不再重复做坦。",
+        pending: "廪尉、太仓 直接砍掉换两个新劝农兵，还是保留它们改成 6 / 3 / 3？",
+        source: "doc/03-content/species.md 3.0 · units.md 5.0"
+      },
+      play: {
+        pitch: "粮就是血：田不能空、仓不能满。开仓把攒下的一轮收成立刻兑现，守廪把失误买回来；专属兵种大多在「把粮烧成战力」和「把粮存成身板」之间选边。",
+        phases: [
+          { name: "开局", text: "先把 3 块肥沃格种满——开局那次「劝农」优先拿食物种子。2 次免费招募先补前排（干城 / 垒卒）或经济位（采薇 / 饷者）；没有植物时不要拿圃师。15 食物留作播种与扩田周转，别急着喂仓士。" },
+          { name: "前期", text: "食物种子每 3 事件 +2，目标是把 3 田喂满、收入不断档。开仓不要顺手就开：等种子计数刚归零再开，等于白拿一整轮产出。守廪留给完整度见底的那一场，满血用掉最亏。" },
+          { name: "中期", text: "攒巢穴经验扩到 L2（6 田），再按三条流派分叉。夏 / 秋开始的「劝农」按当前方向补种子：积廪补食物或战果，劝农补工具与植物。别为了多一颗田把招募费挤没。" },
+          { name: "后期", text: "冬天守廪保完整度；积廪把存粮一次性换成太仓 / 实卒的爆发；劝农靠 9 田与植物滚到底。冬季食物消耗修正只作用在招募与修复上，存粮不会因为冬天变便宜。" }
+        ],
+        combos: [
+          "开仓 → 同一回合进招募组 / 交廪尉 / 太仓：把催熟出来的粮立刻变成战力。",
+          "饷者每场 2–3 食物 + 随机友军 +1.0 上限，长局里慢慢把干城 / 镇廪喂厚。",
+          "圃师 + 田正 + 植物三件套：存活植物同时给全队攻击与护盾，越拖越强。"
+        ],
+        mistakes: [
+          "田空着不种——收入断档，后面所有计划都缺粮。",
+          "开仓在计数快满时用，白白浪费一轮。",
+          "前期把粮喂仓士，导致没钱扩田 / 招募，节奏直接停摆。",
+          "只烧粮不存粮：实卒和守廪体系都吃不上资源。"
+        ]
+      },
       extra: "开局默认 L1 / 3 肥沃格 / 1 基础食物种子 / 15 食物；共享池权重均衡；上手难度中等。" }
   ],
 
@@ -164,9 +220,9 @@ window.HANDBOOK = {
   // ── 枚举值 ───────────────────────────────────────
   enums: [
     { group: "阶级", items: [
-      { key: "一阶", value: "巢穴 L1", status: "已定" },
-      { key: "二阶", value: "巢穴 L2", status: "已定" },
-      { key: "三阶", value: "巢穴 L3", status: "已定" }
+      { key: "一阶", value: "巢穴 L1 · 成长位：很多是未来的大哥，早期培养不亏", status: "已定" },
+      { key: "二阶", value: "巢穴 L2 · 机制位：补新打法，不做一阶的加强版", status: "已定" },
+      { key: "三阶", value: "巢穴 L3 · 机制位：补新打法，不做一阶的加强版", status: "已定" }
     ]},
     { group: "站位", items: [
       { key: "前排", value: "最多 4 格，前排全灭前后排不可被攻击", status: "已定" },

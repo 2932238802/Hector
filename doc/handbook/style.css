@@ -535,6 +535,29 @@ main {
   color: var(--dim);
 }
 
+/* ── 玩法标签 ─────────────────────────── */
+.playtags {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 9px;
+}
+
+.playtags .pt-label {
+  font-size: 11px;
+  letter-spacing: .1em;
+  color: var(--dim);
+  margin-right: 1px;
+}
+
+.chip.play {
+  color: #d2d2d7;
+  border-color: #43434a;
+  background: rgba(255, 255, 255, .035);
+  font-size: 11px;
+}
+
 /* ── 虫种 ─────────────────────────────── */
 .species-card { padding: 18px; }
 
@@ -609,6 +632,154 @@ main {
   border-radius: 50%;
   background: #a9a9b0;
 }
+
+/* ── 流派骨架 ─────────────────────────── */
+.build-grid {
+  display: grid;
+  gap: 9px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.build-card {
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .022);
+  padding: 10px 12px 11px;
+}
+
+.build-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 7px;
+}
+
+.build-head .bn {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: .07em;
+  font-size: 13.5px;
+}
+
+.build-head .bq { font-size: 12px; color: var(--dim); }
+
+.build-role {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 9px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-top: 1px solid var(--line-soft);
+  font-size: 12.5px;
+}
+
+.build-role:first-child { border-top: 0; }
+
+.build-role .br { color: var(--muted); }
+
+.build-role .bu {
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.build-role .ba {
+  min-width: 32px;
+  text-align: right;
+  font-size: 11.5px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.build-role .ba.add { color: #e4e4e7; font-weight: 600; }
+
+.build-role .ba.re { color: #b9b9bf; }
+
+.build-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--dim);
+  line-height: 1.6;
+}
+
+.build-note.out::before { content: "挤掉 · "; color: #9c9ca2; }
+
+.build-tiers { display: grid; gap: 4px; margin-top: 4px; }
+
+.build-tier {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 10px;
+  font-size: 12.5px;
+  padding: 3px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.build-tier:first-child { border-top: 0; }
+
+.build-tier .tt { color: var(--dim); }
+.build-tier .tu { color: var(--muted); }
+
+.build-pending {
+  margin: 11px 0 0;
+  padding: 8px 11px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.build-pending::before { content: "待定 · "; color: var(--dim); font-weight: 600; }
+
+/* ── 虫种玩法 ─────────────────────────── */
+.play-pitch {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-left: 2px solid #c9c9cf;
+  background: rgba(255, 255, 255, .035);
+  border-radius: 0 8px 8px 0;
+  font-size: 13.5px;
+  color: #dcdce0;
+}
+
+.play-phases { display: grid; gap: 6px; }
+
+.play-phase {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .02);
+  font-size: 13px;
+}
+
+.play-phase .pn {
+  flex: none;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: .06em;
+  font-size: 12.5px;
+}
+
+.play-phase .pt { color: var(--muted); line-height: 1.6; }
+
+.play-sub {
+  margin: 12px 0 5px;
+  font-size: 12px;
+  letter-spacing: .1em;
+  color: var(--dim);
+  font-weight: 600;
+}
+
+.play-list { margin: 0; padding-left: 16px; display: grid; gap: 4px; }
+
+.play-list li { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+.play-list.bad li::marker { color: #9c9ca2; }
 
 .meta-line { margin-top: 13px; font-size: 12.5px; color: var(--dim); }
 
