@@ -17,6 +17,7 @@ var side_box: VBoxContainer
 var log_label: RichTextLabel
 var season_label: Label
 var progress_label: Label
+var weather_label: Label
 var resources_label: Label
 var army_label: Label
 var health_label: Label
@@ -213,6 +214,11 @@ func _build_hud() -> Control:
 	progress_label.add_theme_color_override("font_color", MUTED)
 	box.add_child(progress_label)
 
+	weather_label = Label.new()
+	weather_label.add_theme_color_override("font_color", MUTED)
+	weather_label.add_theme_font_size_override("font_size", 14)
+	box.add_child(weather_label)
+
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(spacer)
@@ -313,6 +319,7 @@ func _refresh() -> void:
 		game.turn, GameStateScript.TOTAL_TURNS
 	]
 	progress_label.text = _phase_text()
+	weather_label.text = game.weather_forecast_text()
 	resources_label.text = "食物 %d   巢穴经验 %d   种子 %d（已种 %d）" % [
 		int(game.resources["food"]), game.exp_points, game.seeds.size(), game.planted.size()
 	]

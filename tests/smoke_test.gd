@@ -170,6 +170,7 @@ func _test_seed_planting() -> void:
 
 func _test_seed_harvest() -> void:
 	var game = _boot(9)
+	game.weather = "cloudy"
 	var food_before := int(game.resources["food"])
 	game._tick_planted()
 	game._tick_planted()
@@ -182,6 +183,12 @@ func _test_seed_harvest() -> void:
 	game._tick_planted()
 	game._tick_planted()
 	check(int(game.resources["food"]) == food_before + 6, "second harvest at event 6")
+
+	game.weather = "clear"
+	game._tick_planted()
+	game._tick_planted()
+	game._tick_planted()
+	check(int(game.resources["food"]) == food_before + 10, "clear weather adds +1 production")
 
 
 func _test_turn_flow() -> void:
@@ -259,6 +266,8 @@ func _test_weather() -> void:
 	check("天气" in "\n".join(game.logs), "turn log mentions the weather")
 	check(game.season_weathers.size() == 6, "6 weather states per season")
 	check(game.forecast_weather(0) == game.weather, "forecast offset 0 = current weather")
+	check(game.forecast_weather(1) != "", "forecast shows next turn")
+	check("天气 " in game.weather_forecast_text(), "forecast text is built")
 
 	# 雨天：出战不扣食物（Q-052 补给已取消）
 	var battle_game = _boot(2026)

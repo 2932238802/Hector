@@ -993,8 +993,23 @@ func season_name() -> String:
 
 
 func weather_name() -> String:
+	return weather_display_name(weather)
+
+
+func weather_display_name(id: String) -> String:
 	var names: Dictionary = balance.get("weather", {}).get("names", {})
-	return str(names.get(weather, weather))
+	return str(names.get(id, id))
+
+
+## 当前天气 + 未来 2 回合预报（Q-091 默认窗口；越界自动截断）。
+func weather_forecast_text() -> String:
+	var parts: Array[String] = []
+	for offset in 3:
+		var id := forecast_weather(offset)
+		if id == "":
+			break
+		parts.append(("【%s】" % weather_display_name(id)) if offset == 0 else weather_display_name(id))
+	return "天气 " + " → ".join(parts)
 
 
 func _weather_effect(key: String, default_value: float) -> float:
@@ -1293,10 +1308,11 @@ func _harvest(info: Dictionary) -> void:
 	var name := str(info.get("name", "种子"))
 	match kind:
 		"food":
-			# 春季生产 +1（Q-057 占位）；晴天生产加成尚未接入。
+			# 春季生产 +1（Q-057 占位）；晴天生产 +1（Q-053 提案）。
 			var bonus := 0
 			if season == 0:
 				bonus += int(balance.get("spring", {}).get("production_bonus", 0))
+			bonus += int(_weather_effect("production_bonus", 0.0))
 			resources["food"] = int(resources["food"]) + amount + bonus
 			_add_log("【%s】收获：食物 +%d。" % [name, amount + bonus])
 		"warspoil":
