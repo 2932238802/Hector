@@ -502,6 +502,14 @@ main {
 
 .stats dd small { font-size: 10px; color: var(--dim); margin-left: 2px; }
 
+.stats > div.s2 {
+  background: rgba(255, 255, 255, .07);
+  border-color: #3d3d44;
+}
+
+.stats > div.s2 dt { color: #a9a9b1; }
+.stats > div.s2 dd { color: #f0f0f3; }
+
 .signature {
   display: flex;
   gap: 8px;
@@ -535,8 +543,18 @@ main {
   color: var(--dim);
 }
 
-/* ── 玩法标签 ─────────────────────────── */
-.playtags {
+/* ── 合成升星 ─────────────────────────── */
+.merge-callout {
+  border-style: solid;
+  border-color: var(--line-soft);
+  background: rgba(255, 255, 255, .028);
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.merge-callout b { color: var(--white); }
+
+/* ── 玩法标签 ─────────────────────────── */.playtags {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -892,6 +910,15 @@ main {
 .enum-item .v { color: var(--muted); flex: 1; }
 
 .enum-item .badge { transform: translateY(-1px); }
+
+.enum-item .hold {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #7c7c86;
+}
+
+.enum-item .hold b { color: #c9c9d1; font-weight: 600; }
 
 /* ── 数值公式 ─────────────────────────── */
 .formula-table {

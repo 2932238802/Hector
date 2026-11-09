@@ -56,7 +56,7 @@ last-review: 2026-11-09
 | `ap` | int | ≥ 1，默认 1 |
 | `row` | enum | `front` / `back` / `either` |
 | `signature` | object | `{id, name, text, params}`；`params` 放可调数值 |
-| `keywords` | string[] | 只能取 `扼守` / `迅捷` / `不甘` / `负伤` / `战蜕` |
+| `keywords` | string[] | 只能取 `迅捷` / `角质化` / `点卯` / `营巢` / `不甘` / `余勇` / `猎杀` / `反噬` / `寄生` / `狂热` / `引导` / `扼守` / `不灭` / `偷袭` / `护卫` / `迟滞` |
 | `weakness` | string | 主要缺点，一句话 |
 | `status` | enum | `final` / `proposal`（数据侧标记，UI 可显示） |
 

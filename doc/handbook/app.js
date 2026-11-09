@@ -22,6 +22,11 @@
     return typeof n === "number" ? n.toFixed(1) : esc(n);
   };
 
+  // 二星数值：一星基础值 + 一份基础值（未成长时即 ×2）；局内永久成长不在本页显示
+  var numStar = function (n) {
+    return typeof n === "number" ? (n * 2).toFixed(1) : esc(n);
+  };
+
   var badge = function (status) {
     var s = String(status);
     var cls = s === "已定" ? "ok" : s === "提案" ? "wip" : s === "待定" ? "todo" : "mixed";
@@ -80,9 +85,12 @@
             "<div><dt>成本</dt><dd>" + num(u.cost) + "<small>食</small></dd></div>" +
             "<div><dt>生命</dt><dd>" + num1(u.hp) + "</dd></div>" +
             "<div><dt>攻击</dt><dd>" + num1(u.atk) + "</dd></div>" +
+            '<div class="s2"><dt>★2 生命</dt><dd>' + numStar(u.hp) + "</dd></div>" +
+            '<div class="s2"><dt>★2 攻击</dt><dd>' + numStar(u.atk) + "</dd></div>" +
           "</dl>" +
-          '<div class="signature"><span class="sig-name">' + esc(u.sig) +
-            '</span><span class="sig-text">' + esc(u.text) + "</span></div>" +
+          '<div class="signature">' +
+            (u.sig ? '<span class="sig-name">' + esc(u.sig) + "</span>" : "") +
+            '<span class="sig-text">' + esc(u.text) + "</span></div>" +
           playTags +
           (u.note ? '<p class="note">' + esc(u.note) + "</p>" : "") +
         "</article>"
@@ -127,6 +135,8 @@
               "</b> / 三阶 <b>" + tierN(3) + "</b></span>" +
           "</div>" +
         "</div>" +
+        (D.meta.merge ? '<div class="callout merge-callout"><b>' + esc(D.meta.merge.title) +
+          "</b>：" + esc(D.meta.merge.text) + "</div>" : "") +
         '<div class="filters" id="unit-filters">' +
           '<div class="filter-group"><span class="filter-label">阶级</span>' + tierChips() + "</div>" +
           '<div class="filter-group"><span class="filter-label">来源</span>' + kindChips() + "</div>" +
@@ -392,10 +402,14 @@
   function renderEnums() {
     var cards = D.enums.map(function (g) {
       var items = g.items.map(function (it) {
+        var hold = it.holders
+          ? '<span class="hold">持有 <b>' + it.holders.length + "</b> · " +
+            (it.holders.length ? it.holders.map(esc).join(" / ") : "无") + "</span>"
+          : "";
         return (
           '<div class="enum-item">' +
             '<span class="k">' + esc(it.key) + "</span>" +
-            '<span class="v">' + esc(it.value) + "</span>" +
+            '<span class="v">' + esc(it.value) + hold + "</span>" +
             badge(it.status) +
           "</div>"
         );
@@ -403,7 +417,7 @@
 
       return (
         '<article class="card enum-card" data-search="' +
-        esc(searchKey([g.group].concat(g.items.map(function (i) { return i.key + " " + i.value; })))) +
+        esc(searchKey([g.group].concat(g.items.map(function (i) { return i.key + " " + i.value + " " + (i.holders || []).join(" "); })))) +
         '">' +
           "<h3>" + esc(g.group) + "</h3>" + items +
         "</article>"
