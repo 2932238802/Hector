@@ -1,5 +1,5 @@
 extends SceneTree
-## M2 冒烟测试：24 回合 / 食物单资源 / L2 开局 / 种子生产。
+## 冒烟测试：春季 6 回合主循环、可反复招募、手动点选战斗、关键词钩子。
 ## 用法：godot --headless --path <project> --script res://tests/smoke_test.gd
 
 const GameStateScript := preload("res://scripts/core/game_state.gd")
@@ -13,6 +13,9 @@ func _initialize() -> void:
 	_test_hex_grid()
 	_test_new_game()
 	_test_opening_recruit()
+	_test_repeat_recruit()
+	_test_recruit_cost_and_refresh()
+	_test_army_cap()
 	_test_event_options()
 	_test_nest_expansion()
 	_test_seed_planting()
@@ -27,9 +30,10 @@ func _initialize() -> void:
 	_test_final_ruling()
 	_test_battle_defeat()
 	_test_encounter_options()
-	_test_recruit()
-	_test_recruit_tiers()
+	_test_keyword_hooks()
+	_test_sell()
 	_test_unit_pool()
+	_test_tier_units()
 	_test_data_store()
 	_test_full_run()
 
@@ -51,8 +55,42 @@ func _boot(seed: int):
 	var game = GameStateScript.new(seed)
 	while game.phase == GameStateScript.Phase.RECRUIT:
 		game.skip_recruit()
-	game.army.assign(["ruishi", "chihou", "caiwei"])
+	game.army.clear()
+	for unit_id in ["houwang", "hushi", "cangcao"]:
+		_add_unit(game, unit_id)
+	game.phase = GameStateScript.Phase.ACTION
 	return game
+
+
+func _add_unit(game, unit_id: String) -> Dictionary:
+	var entry: Dictionary = game._new_army_unit(unit_id)
+	game.army.append(entry)
+	return entry
+
+
+func _deploy_uid(game, unit_id: String) -> int:
+	for entry in game.deploy_units:
+		if str(entry["unit_id"]) == unit_id:
+			return int(entry["uid"])
+	return -1
+
+
+func _first_ready_player(game) -> Dictionary:
+	for row in ["front", "back"]:
+		for unit in game.battle["player"][row]:
+			# 0 攻击单位（驿传蚁）有行动点也不能普攻，自动战斗跳过它。
+			if bool(unit["alive"]) and int(unit["ap"]) > 0 and float(unit["atk"]) > 0.0:
+				return unit
+	return {}
+
+
+func _first_alive_enemy(game) -> Array:
+	var row := "front" if game.enemies_front_alive() else "back"
+	var list: Array = game.battle["enemies"][row]
+	for index in list.size():
+		if bool(list[index]["alive"]):
+			return [row, index]
+	return []
 
 
 func _test_hex_grid() -> void:
@@ -64,18 +102,17 @@ func _test_hex_grid() -> void:
 	var axial := Vector2i(2, -1)
 	var round_trip := HexGridScript.pixel_to_axial(HexGridScript.axial_to_pixel(2, -1, 40.0), 40.0)
 	check(round_trip == axial, "pixel <-> axial round trip")
-
 	check(HexGridScript.direction_of(-1, 0) == 3, "river side direction = 3")
 
 
 func _test_new_game() -> void:
 	var game = GameStateScript.new(1234)
 	check(game.turn == 1, "turn starts at 1")
-	check(game.phase == GameStateScript.Phase.RECRUIT, "starts with 2 free recruits")
-	check(game.free_recruits_left == 2, "2 free recruits queued")
+	check(game.phase == GameStateScript.Phase.RECRUIT, "turn 1 opens with a recruit window")
+	check(game.free_recruits_left == 2, "2 free recruits in the opening window")
 	check(game.recruit_candidates.size() == 3, "opening offers 3 candidates")
 	check(game.season_name() == "春", "starts in spring")
-	check(int(game.resources["food"]) == 15, "starts with 15 food (no upkeep)")
+	check(int(game.resources["food"]) == 15, "starts with 15 food")
 	check(game.resources.keys() == ["food"], "food is the only resource")
 	check(is_equal_approx(game.health, 100.0), "start health 100")
 	check(game.groups.size() == 3, "3 event groups generated")
@@ -98,22 +135,79 @@ func _test_opening_recruit() -> void:
 	check(game.recruit(first), "free recruit ignores cost")
 	check(int(game.resources["food"]) == 0, "free recruit costs nothing")
 	check(game.free_recruits_left == 1, "one free recruit left")
-	check(game.phase == GameStateScript.Phase.RECRUIT, "still in opening recruit")
-	game.resources["food"] = 13
-	game._open_free_recruit()
-	check(game.recruit(game.recruit_candidates[0]), "second free recruit works")
+	check(game.phase == GameStateScript.Phase.RECRUIT, "recruit window stays open")
+
+	var second: String = game.recruit_candidates[0]
+	check(game.recruit(second), "second free recruit works")
 	check(game.army.size() == 2, "opening produces 2 units")
-	check(game.phase == GameStateScript.Phase.ACTION, "opening ends in ACTION")
+	check(game.free_recruits_left == 0, "free recruits spent")
+	check(game.recruit_candidates.is_empty(), "no affordable candidates with 0 food")
+
+	check(game.end_recruit(), "ending the window advances the turn")
+	check(game.phase == GameStateScript.Phase.GROUP_SELECT, "recruit window -> event group select")
 
 	var skipped = GameStateScript.new(125)
 	skipped.skip_recruit()
-	skipped.skip_recruit()
-	check(skipped.army.is_empty(), "both free recruits can be skipped")
-	check(skipped.phase == GameStateScript.Phase.ACTION, "skipping both starts the turn")
+	check(skipped.army.is_empty(), "opening can be skipped")
+	check(skipped.phase == GameStateScript.Phase.GROUP_SELECT, "skip goes to GROUP_SELECT")
+
+
+func _test_repeat_recruit() -> void:
+	var game = GameStateScript.new(126)
+	game.resources["food"] = 8
+	game.free_recruits_left = 0
+	game._open_recruit_window("turn")
+	var count := 0
+	while game.recruit_candidates.size() > 0 and int(game.resources["food"]) >= 4:
+		var before: int = game.army.size()
+		check(game.recruit(game.recruit_candidates[0]), "paid recruit #%d succeeds" % (count + 1))
+		check(game.army.size() == before + 1, "army grows in the same window")
+		check(game.phase == GameStateScript.Phase.RECRUIT, "window remains open after recruiting")
+		count += 1
+		if count > 10:
+			break
+	check(count == 2, "8 food buys 2 units at 4 food each")
+	check(int(game.resources["food"]) == 0, "food is spent per recruit")
+	check(game.recruit_candidates.is_empty(), "candidates re-roll to affordable options")
+	game.end_recruit()
+	check(game.phase == GameStateScript.Phase.GROUP_SELECT, "ending repeat recruit advances")
+
+
+func _test_recruit_cost_and_refresh() -> void:
+	var game = GameStateScript.new(127)
+	game.free_recruits_left = 0
+	game.resources["food"] = 10
+	check(game.refresh_recruit(), "refresh works")
+	check(int(game.resources["food"]) == 9, "refresh costs 1 food")
+	check(game.refresh_recruit(), "refresh is repeatable in the same window")
+	check(int(game.resources["food"]) == 8, "second refresh also costs 1 food")
+
+	var duzhi_game = GameStateScript.new(128)
+	_add_unit(duzhi_game, "duzhi")
+	duzhi_game.resources["food"] = 20
+	duzhi_game._spend_food(6)
+	check(duzhi_game.free_refreshes == 1, "度支蚁 grants 1 free refresh per 6 food spent")
+	duzhi_game.free_recruits_left = 0
+	var food_before := int(duzhi_game.resources["food"])
+	check(duzhi_game.refresh_recruit(), "free refresh works")
+	check(duzhi_game.free_refreshes == 0, "free refresh is consumed")
+	check(int(duzhi_game.resources["food"]) == food_before, "free refresh costs no food")
+
+
+func _test_army_cap() -> void:
+	var game = GameStateScript.new(129)
+	while game.army.size() < int(game.balance["army"]["max_size"]):
+		_add_unit(game, "houwang")
+	var candidate: String = game.recruit_candidates[0]
+	check(not game.can_recruit(candidate), "cannot recruit at max army size")
+	check(not game.recruit(candidate), "recruit rejected at max army size")
+	check(game.phase == GameStateScript.Phase.RECRUIT, "still can end the window")
+	game.end_recruit()
+	check(game.phase == GameStateScript.Phase.GROUP_SELECT, "full army still advances")
 
 
 func _test_event_options() -> void:
-	var game = _boot(126)
+	var game = _boot(130)
 	_force_single_event(game, {
 		"id": "test_option", "category": "random", "pressure": false,
 		"title": "选项测试", "text": "",
@@ -135,9 +229,9 @@ func _test_event_options() -> void:
 	})
 	check(game.choose_event_option(0), "battle option opens deployment")
 	check(game.phase == GameStateScript.Phase.DEPLOY, "battle option enters DEPLOY")
-	check(str(game.pending_event.get("battle", "")) == "sand", "battle option carries tier")
+	check(str(game.pending_event.get("battle", "")) == "sand", "battle option carries encounter id")
 
-	var lethal = _boot(127)
+	var lethal = _boot(131)
 	lethal.health = 3.0
 	_force_single_event(lethal, {
 		"id": "test_lethal", "category": "random", "pressure": false,
@@ -149,17 +243,19 @@ func _test_event_options() -> void:
 
 
 func _test_nest_expansion() -> void:
-	var game = _boot(7)
-	check(not game.choose_action("expand"), "expansion rejected with 15 food (needs 20)")
-	check(game.phase == GameStateScript.Phase.ACTION, "failed expansion stays in ACTION")
+	var poor = _boot(7)
+	poor.resources["food"] = 5
+	check(not poor.choose_action("expand"), "expansion rejected with 5 food (needs 12)")
+	check(poor.phase == GameStateScript.Phase.ACTION, "failed expansion stays in ACTION")
 
-	game.resources["food"] = 40
-	check(game.choose_action("expand"), "expansion succeeds with 40 food")
+	var game = _boot(7)
+	game.resources["food"] = 30
+	check(game.choose_action("expand"), "expansion succeeds with 30 food")
 	check(game.nest_level == 2, "nest reaches level 2")
-	check(game.cells.size() == 19, "L2 = 1 + 6 + 12 cells (blocked cells included)")
+	check(game.cells.size() == 19, "L2 = 1 + 6 + 12 cells")
 	check(game.nest_blocked_cells() == 2, "river blocks 2 cells at L2")
-	check(int(game.resources["food"]) == 20, "expansion costs 20 food (L1 -> L2)")
-	check(game.phase == GameStateScript.Phase.GROUP_SELECT, "expansion advances to GROUP_SELECT")
+	check(int(game.resources["food"]) == 18, "L1 -> L2 costs 12 food")
+	check(game.phase == GameStateScript.Phase.RECRUIT, "action ends the turn into next recruit window")
 	check(game.fertile_count() == 6, "L2 has 6 fertile cells")
 
 
@@ -206,19 +302,21 @@ func _test_turn_flow() -> void:
 	var game = _boot(99)
 	game.health = 50.0
 	check(game.choose_action("heal"), "heal succeeds (food 15 >= 4)")
-	check(int(game.resources["food"]) == 11, "heal costs 4 food (15 - 4)")
+	check(int(game.resources["food"]) == 11, "heal costs 4 food")
 	check(game.health > 50.0, "heal raises health")
-	check(game.phase == GameStateScript.Phase.GROUP_SELECT, "action advances to GROUP_SELECT")
+	check(game.phase == GameStateScript.Phase.RECRUIT, "action -> next turn recruit window")
+	check(game.turn == 2, "turn advances after the action")
 
+	game.end_recruit()
+	check(game.phase == GameStateScript.Phase.GROUP_SELECT, "ending recruit -> group select")
 	check(game.choose_group(0), "group 0 selectable")
 	check(game.phase == GameStateScript.Phase.EVENT, "enters EVENT phase")
 	check(game.event_index == 0, "event index starts at 0")
 
 	_play_until_turn_end(game)
 
-	check(game.turn == 2, "turn advances after 4 events")
-	check(game.phase == GameStateScript.Phase.ACTION, "new turn starts in ACTION")
-	check(game.event_index == 0, "event index reset")
+	check(game.phase == GameStateScript.Phase.ACTION, "4 events end in ACTION")
+	check(game.turn == 2, "still the same turn until an action is chosen")
 	check(int(game.resources["food"]) >= 0, "resources never negative")
 	check(game.health > 0.0, "nest still alive")
 
@@ -280,7 +378,6 @@ func _test_weather() -> void:
 	check(game.forecast_weather(1) != "", "forecast shows next turn")
 	check("天气 " in game.weather_forecast_text(), "forecast text is built")
 
-	# 雨天：出战不扣食物（Q-052 补给已取消）
 	var battle_game = _boot(2026)
 	battle_game.weather = "rain"
 	_force_single_event(battle_game, {
@@ -289,12 +386,10 @@ func _test_weather() -> void:
 	})
 	battle_game.choose_encounter("fight")
 	check(battle_game.phase == GameStateScript.Phase.DEPLOY, "rain battle enters DEPLOY")
-	check(battle_game.deploy_supply() == 0, "battle supply removed")
 	var food_before := int(battle_game.resources["food"])
 	check(battle_game.start_battle(), "rain battle starts")
 	check(int(battle_game.resources["food"]) == food_before, "starting a battle costs no food")
 
-	# 雨天：探索食物损失 +1，完整度 -3（基础 -2 + 雨天 -1）
 	var adventure_game = _boot(11)
 	adventure_game.season = 1
 	adventure_game.weather = "rain"
@@ -307,15 +402,14 @@ func _test_weather() -> void:
 	)
 	check(is_equal_approx(health_before - adventure_game.health, 3.0), "rain adds 1 health loss to adventure")
 
-	# 晴天：冒险食物 +1（基础 2–4 -> 3–5）
 	var sunny_game = _boot(12)
 	sunny_game.season = 1
 	sunny_game.weather = "clear"
 	sunny_game.resources["food"] = 50
 	sunny_game.choose_action("adventure")
 	check(
-		int(sunny_game.resources["food"]) >= 51 and int(sunny_game.resources["food"]) <= 54,
-		"clear weather adds 1 adventure food"
+		int(sunny_game.resources["food"]) >= 50 and int(sunny_game.resources["food"]) <= 54,
+		"clear weather adventure stays in the base range"
 	)
 
 
@@ -331,22 +425,40 @@ func _test_battle() -> void:
 	check(game.phase == GameStateScript.Phase.DEPLOY, "enters DEPLOY phase")
 	check(game.deploy_units.size() == 3, "all 3 units listed for deployment")
 	check(game.deployed_count() == 3, "all units deployed by default")
-	check(game.deploy_supply() == 0, "no battle supply")
 	check(game.can_start_battle(), "can start with any food")
 
-	check(game.deploy_set("caiwei", ""), "can bench a unit")
+	var hushi_uid := _deploy_uid(game, "hushi")
+	check(game.deploy_set(hushi_uid, ""), "can bench a unit")
 	check(game.deployed_count() == 2, "benching removes one unit")
-	check(game.deploy_set("caiwei", "back"), "can redeploy the unit")
+	check(game.deploy_set(hushi_uid, "back"), "can redeploy the unit")
 	check(game.deployed_count() == 3, "redeploy restores 3")
+
 	check(game.start_battle(), "battle starts")
 	check(game.phase == GameStateScript.Phase.BATTLE, "enters BATTLE phase")
 	check(int(game.resources["food"]) == food_before, "starting a battle costs no food")
-	check(game.battle["enemies"]["front"].size() == 2, "weak tier front = 2")
-	check(game.battle["enemies"]["back"].size() == 0, "weak tier back = 0")
+	check(game.battle["enemies"]["front"].size() == 2, "sand encounter front = 2")
+	check(game.battle["enemies"]["back"].size() == 0, "sand encounter back = 0")
 
-	_auto_battle(game)
+	check(not game.player_attack("front", 0), "attack needs a selected unit")
+	check(game.selected_player().is_empty(), "nothing selected before clicking own unit")
 
-	check(game.phase != GameStateScript.Phase.BATTLE, "battle ends")
+	for row in ["front", "back"]:
+		for enemy in game.battle["enemies"][row]:
+			enemy["hp"] = 0.5
+			enemy["shield"] = 0.0
+
+	var front_uid := int(game.battle["player"]["front"][0]["uid"])
+	check(game.select_player(front_uid), "selecting own unit works")
+	check(game.selected_player()["uid"] == front_uid, "selected unit is tracked")
+	check(game.player_attack("front", 0), "selected unit attacks chosen target")
+	check(int(game.battle["player"]["front"][0]["ap"]) == 0, "attack consumes the unit's 1 AP")
+	check(game.selected_player().is_empty(), "selection clears at 0 AP")
+
+	var second_uid := int(game.battle["player"]["front"][1]["uid"])
+	check(game.select_player(second_uid), "second front unit selectable")
+	check(game.player_attack("front", 1), "second attack resolves")
+
+	check(game.phase != GameStateScript.Phase.BATTLE, "battle ends after all enemies die")
 	check(game.battle.is_empty(), "battle state cleared")
 	check(game.army.size() == 3, "units return after battle (army unchanged)")
 	var loot := int(game.resources["food"]) - food_before
@@ -356,10 +468,16 @@ func _test_battle() -> void:
 
 func _test_enemy_formation() -> void:
 	var game = _boot(4242)
-	game.enemies_data = {"tiers": {"test": {"name": "阵列测试", "units": [
-		{"name": "前", "hp": 5.0, "atk": 1.0, "ap": 1, "row": "front", "count": 6},
-		{"name": "后", "hp": 5.0, "atk": 1.0, "ap": 1, "row": "back", "count": 4},
-	]}}}
+	game.enemies_data = {
+		"enemies": [
+			{"id": "tf", "name": "前", "hp": 5.0, "attack": 1.0, "ap": 1, "row": "front"},
+			{"id": "tb", "name": "后", "hp": 5.0, "attack": 1.0, "ap": 1, "row": "back"},
+		],
+		"encounters": {"test": {"name": "阵列测试", "units": [
+			{"enemy_id": "tf", "count": 6},
+			{"enemy_id": "tb", "count": 4},
+		]}},
+	}
 	_force_single_event(game, {
 		"id": "test_formation", "category": "enemy_weak", "pressure": true,
 		"title": "阵列测试", "text": "", "battle": "test", "effects": {},
@@ -381,13 +499,17 @@ func _test_target_rules() -> void:
 	game.choose_encounter("fight")
 	game.start_battle()
 	check(game.phase == GameStateScript.Phase.BATTLE, "bird battle starts")
-	check(game.battle["enemies"]["front"].size() == 1, "bird tier front = 1 (盾甲)")
-	check(game.battle["enemies"]["back"].size() == 1, "bird tier back = 1 (掠食雀)")
+	check(game.battle["enemies"]["front"].size() == 1, "bird encounter front = 1 (盾甲)")
+	check(game.battle["enemies"]["back"].size() == 1, "bird encounter back = 1 (掠食雀)")
 	check(game.enemies_front_alive(), "enemy front is alive")
+
+	var uid := int(game.battle["player"]["front"][0]["uid"])
+	check(game.select_player(uid), "select a front unit")
+	var ap_before := int(game.selected_player()["ap"])
 	check(not game.player_attack("back", 0), "cannot attack back row while front alive")
-	check(game.player_has_ap(), "rejected attack does not consume AP")
+	check(int(game.selected_player()["ap"]) == ap_before, "rejected attack does not consume AP")
 	check(game.player_attack("front", 0), "can attack front row")
-	check(int(game.battle["player"]["front"][0]["ap"]) == 0, "attack consumes the unit's 1 AP")
+	check(int(game.battle["player"]["front"][0]["ap"]) == 0, "attack consumes 1 AP")
 
 
 func _test_final_ruling() -> void:
@@ -421,7 +543,7 @@ func _test_final_ruling() -> void:
 func _test_battle_defeat() -> void:
 	var game = _boot(556)
 	game.army.clear()
-	game.army.append("caiwei")
+	_add_unit(game, "houwang")
 	_force_single_event(game, {
 		"id": "test_defeat", "category": "enemy", "pressure": true,
 		"title": "必败战斗", "text": "", "battle": "bird", "effects": {"food": 5},
@@ -432,7 +554,7 @@ func _test_battle_defeat() -> void:
 	_auto_battle(game)
 
 	check(game.phase != GameStateScript.Phase.BATTLE, "defeat ends the battle")
-	check(is_equal_approx(game.health, maxf(0.0, health_before - 10.0)), "defeat costs 10 nest health")
+	check(is_equal_approx(game.health, maxf(0.0, health_before - 5.0)), "defeat costs 5 nest health")
 	check(game.army.size() == 1, "soldier returns after defeat")
 
 
@@ -460,106 +582,265 @@ func _test_encounter_options() -> void:
 	check(avoid_game.event_index == 1, "avoid advances the event")
 
 
-func _test_recruit() -> void:
-	var game = _boot(777)
-	_force_single_event(game, {
-		"id": "test_recruit", "category": "self", "pressure": false,
-		"title": "育婴室", "text": "", "recruit": true, "effects": {},
-	})
-	game.ready_up()
-	check(game.phase == GameStateScript.Phase.RECRUIT, "recruit event enters RECRUIT phase")
-	check(game.recruit_candidates.size() == 3, "3 recruit candidates")
-	for unit_id in game.recruit_candidates:
-		var data: Dictionary = game.unit_info(unit_id)
-		check(int(data.get("tier", 1)) == 1, "L1 recruits are tier 1: " + unit_id)
-		check(int(data.get("cost", {}).get("food", 99)) <= 15, "candidates are affordable: " + unit_id)
+func _test_keyword_hooks() -> void:
+	var game = _boot(900)
+	game.army.clear()
+	var cangcao := _add_unit(game, "cangcao")
+	var uid := int(cangcao["uid"])
+	game.resources["food"] = 10
+	check(game.can_train_cangcao(uid), "仓曹蚁 can train outside battle")
+	check(game.train_cangcao(uid, "hp"), "积粮 HP training succeeds")
+	check(is_equal_approx(float(cangcao["max_hp"]), 10.0), "积粮 grants +3 max HP permanently")
+	check(int(game.resources["food"]) == 8, "积粮 costs 2 food")
+	check(not game.can_train_cangcao(uid), "积粮 is once per turn per unit")
+	check(not game.train_cangcao(uid, "attack"), "second training in a turn is rejected")
 
+	var duzhi = _boot(901)
+	duzhi.army.clear()
+	_add_unit(duzhi, "duzhi")
+	duzhi.resources["food"] = 20
+	duzhi._spend_food(6)
+	duzhi._spend_food(6)
+	check(duzhi.free_refreshes == 2, "度支蚁 accumulates free refreshes every 6 food")
+
+	var unit := {
+		"name": "烽燧蚁", "hp": 7.0, "max_hp": 7.0, "atk": 1.5,
+		"signature": {"id": "yuyong", "params": {"max_hp_gain": 0.5}},
+	}
+	game._after_take_damage(unit, 1.0)
+	check(is_equal_approx(float(unit["max_hp"]), 7.5), "余勇 grants +0.5 max HP after taking damage")
+	check(is_equal_approx(float(unit["hp"]), 7.5), "余勇 immediately heals the new max HP")
+
+
+func _test_sell() -> void:
+	var game = _boot(902)
+	var uid := int(game.army[0]["uid"])
 	var food_before := int(game.resources["food"])
-	check(game.refresh_recruit(), "first refresh works")
-	check(int(game.resources["food"]) == food_before - 3, "refresh costs 3 food")
-	check(not game.refresh_recruit(), "second refresh rejected")
-	check(game.recruit_candidates.size() == 3, "refresh keeps 3 candidates")
+	check(game.sell_price(uid) == 2, "basic unit sells for 2 food")
+	check(game.sell_unit(uid), "selling a unit succeeds outside battle")
+	check(int(game.resources["food"]) == food_before + 2, "selling adds food")
+	check(game.army.size() == 2, "sold unit leaves the army")
+	check(not game.sell_unit(uid), "selling an unknown uid is rejected")
 
-	var picked := ""
-	for unit_id in game.recruit_candidates:
-		if game.can_recruit(unit_id):
-			picked = unit_id
-			break
-	if picked == "":
-		game.skip_recruit()
-		check(game.phase == GameStateScript.Phase.EVENT, "skip returns to EVENT")
-		check(game.event_index == 1, "skip advances the event")
-	else:
-		var army_before: int = game.army.size()
-		check(game.recruit(picked), "recruit succeeds: " + picked)
-		check(game.army.size() == army_before + 1, "army grows by 1")
-		check(game.phase == GameStateScript.Phase.EVENT, "recruit returns to EVENT")
-		check(game.event_index == 1, "recruit advances the event")
+	var zhiku := _add_unit(game, "zhiku")
+	zhiku["battles"] = 3
+	check(game.sell_price(int(zhiku["uid"])) == 5, "质库蚁 sells for 2 + 1 per battle")
+	check(game.sell_unit(int(zhiku["uid"])), "质库蚁 can be sold")
 
-
-func _test_recruit_tiers() -> void:
-	# 升 L2 后的第一次招募必出二阶；升 L3 后必出三阶。
-	var game = _boot(778)
-	game.resources["food"] = 90
-	game.phase = GameStateScript.Phase.ACTION
-	check(game.choose_action("expand"), "expand to L2")
-	check(game.nest_level == 2, "nest is L2")
-	check(game.recruit_pity_tier == 2, "upgrade to L2 sets pity tier 2")
-	_force_single_event(game, {
-		"id": "test_recruit_l2", "category": "self", "pressure": false,
-		"title": "育婴室", "text": "", "recruit": true, "effects": {},
+	var battle_game = _boot(903)
+	_force_single_event(battle_game, {
+		"id": "sell_battle", "category": "enemy", "pressure": true,
+		"title": "卖出限制", "text": "", "battle": "sand", "effects": {},
 	})
-	game.ready_up()
-	var has_tier2 := false
-	for unit_id in game.recruit_candidates:
-		if int(game.unit_info(unit_id).get("tier", 1)) == 2:
-			has_tier2 = true
-	check(has_tier2, "L2 pity guarantees a tier-2 candidate")
-	check(game.recruit_pity_tier == 0, "pity is consumed after the roll")
-
-	game.skip_recruit()
-	game.phase = GameStateScript.Phase.ACTION
-	check(game.choose_action("expand"), "expand to L3")
-	check(game.nest_level == 3, "nest is L3")
-	check(game.recruit_pity_tier == 3, "upgrade to L3 sets pity tier 3")
-	_force_single_event(game, {
-		"id": "test_recruit_l3", "category": "self", "pressure": false,
-		"title": "育婴室", "text": "", "recruit": true, "effects": {},
-	})
-	game.ready_up()
-	var has_tier3 := false
-	for unit_id in game.recruit_candidates:
-		if int(game.unit_info(unit_id).get("tier", 1)) == 3:
-			has_tier3 = true
-	check(has_tier3, "L3 pity guarantees a tier-3 candidate")
-
-	# 食物不足时，只出付得起的候选。
-	var poor = _boot(780)
-	poor.resources["food"] = 5
-	_force_single_event(poor, {
-		"id": "test_recruit_poor", "category": "self", "pressure": false,
-		"title": "育婴室", "text": "", "recruit": true, "effects": {},
-	})
-	poor.ready_up()
-	for unit_id in poor.recruit_candidates:
-		check(int(poor.unit_info(unit_id).get("cost", {}).get("food", 99)) <= 5,
-			"only affordable candidates when food is low: " + unit_id)
+	battle_game.choose_encounter("fight")
+	battle_game.start_battle()
+	check(not battle_game.can_sell(int(battle_game.battle["player"]["front"][0]["uid"])),
+		"cannot sell during battle")
 
 
 func _test_unit_pool() -> void:
 	var game = _boot(781)
-	var counts := {1: 0, 2: 0, 3: 0}
-	for unit in game.units_data.get("units", []):
-		if not bool(unit.get("combat", false)):
-			continue
-		var tier := int(unit.get("tier", 1))
-		counts[tier] += 1
-		check(int(unit.get("ap", 0)) == 1, "base AP is 1: " + str(unit["id"]))
-		check(not unit.has("def"), "no defense stat: " + str(unit["id"]))
-	check(counts[1] == 12, "tier 1 has 12 units (8 shared + 4 exclusive)")
-	check(counts[2] == 8, "tier 2 has 8 units (3 shared + 5 exclusive)")
-	check(counts[3] == 4, "tier 3 has 4 units (1 shared + 3 exclusive)")
-	check(game.unit_info("tunzu").get("name", "") == "仓士", "exclusive unit is present")
+	var units: Array = game.units_data.get("units", [])
+	check(units.size() == 31, "data has 31 units (14 + 11 + 6)")
+	var ids := {}
+	var tier_counts := {1: 0, 2: 0, 3: 0}
+	for unit in units:
+		var id := str(unit.get("id", ""))
+		var tier := int(unit.get("tier", 0))
+		check(not id.is_empty(), "unit has an id")
+		ids[id] = true
+		check(tier >= 1 and tier <= 3, "tier is 1-3: " + id)
+		tier_counts[tier] = int(tier_counts.get(tier, 0)) + 1
+		check(str(unit.get("source", "")) in ["shared", "species"], "unit has a source: " + id)
+		check(int(unit.get("ap", 0)) == 1, "base AP is 1: " + id)
+		check(float(unit.get("hp", 0.0)) > 0.0, "unit has HP: " + id)
+		check(float(unit.get("attack", 0.0)) >= 0.0, "unit has non-negative attack: " + id)
+		check(int(unit.get("cost_food", 0)) > 0, "unit has a food cost: " + id)
+		check(unit.has("signature"), "unit has a signature: " + id)
+		check(not unit.has("def"), "no defense stat: " + id)
+	check(int(tier_counts[1]) == 14, "tier 1 = 14 units")
+	check(int(tier_counts[2]) == 11, "tier 2 = 11 units")
+	check(int(tier_counts[3]) == 6, "tier 3 = 6 units")
+	for expected in [
+		"houwang", "suihuo", "hushi", "fengsui", "yunnou", "duzhi",
+		"cangcao", "kuiliang", "sinong", "zhiku", "leisi", "puqi", "kenong", "dilei",
+		"yichuan", "jiuwu", "jiangzuo", "yinliang", "jingqi", "qintian",
+		"jixiang", "dugeng", "gouxu", "rangrang", "zhangsai", "sishi", "baowu",
+		"taicang", "shicang", "fengren", "zhenlin",
+	]:
+		check(ids.has(expected), "expected unit present: " + expected)
+
+
+func _test_tier_units() -> void:
+	# 招募池按巢穴等级解锁 + 升阶保底。
+	var pool = _boot(910)
+	pool.army.clear()
+	pool.resources["food"] = 100
+	pool.nest_level = 1
+	pool.phase = GameStateScript.Phase.RECRUIT
+	pool.recruit_candidates = pool._roll_recruits()
+	for unit_id in pool.recruit_candidates:
+		check(int(pool.unit_info(unit_id).get("tier", 0)) == 1, "L1 only rolls tier 1")
+	pool.nest_level = 2
+	pool.tier_pity = 2
+	pool.recruit_candidates = pool._roll_recruits()
+	var has_tier2 := false
+	for unit_id in pool.recruit_candidates:
+		if int(pool.unit_info(unit_id).get("tier", 0)) == 2:
+			has_tier2 = true
+	check(has_tier2, "升阶保底 puts a tier-2 unit in the first L2 recruit")
+	check(pool.tier_pity == 0, "升阶保底 is consumed")
+
+	# 驿传蚁：0 攻击、不可攻击；催阵每轮给最高攻友军 +1 AP。
+	var game = _boot(911)
+	game.army.clear()
+	var yichuan := _add_unit(game, "yichuan")
+	var houwang := _add_unit(game, "houwang")
+	_force_single_event(game, {
+		"id": "tier_battle", "category": "enemy", "pressure": true,
+		"title": "二阶测试", "text": "", "battle": "sand", "effects": {},
+	})
+	check(game.choose_encounter("fight"), "tier battle enters deploy")
+	check(game.start_battle(), "tier battle starts")
+	var yichuan_unit: Dictionary = game._player_by_uid(int(yichuan["uid"]))
+	var houwang_unit: Dictionary = game._player_by_uid(int(houwang["uid"]))
+	check(is_equal_approx(float(yichuan_unit["atk"]), 0.0), "驿传蚁 has 0 attack")
+	check(int(houwang_unit["ap"]) == 2, "催阵 grants +1 AP to the highest-attack ally")
+	check(game.select_player(int(yichuan["uid"])), "驿传蚁 can still be selected")
+	check(not game.player_attack("front", 0), "驿传蚁 cannot attack")
+
+	# 沟洫蚁：战斗开始全队 2.0 护盾。
+	var gouxu = _boot(912)
+	gouxu.army.clear()
+	_add_unit(gouxu, "gouxu")
+	_add_unit(gouxu, "houwang")
+	_force_single_event(gouxu, {
+		"id": "tier_gouxu", "category": "enemy", "pressure": true,
+		"title": "沟洫", "text": "", "battle": "sand", "effects": {},
+	})
+	gouxu.choose_encounter("fight")
+	gouxu.start_battle()
+	for unit in gouxu._all_players():
+		check(float(unit["shield"]) >= 2.0, "沟洫蚁 gives the team 2.0 shield")
+
+	# 计相蚁：每累计 6 食物永久 +3 生命 / +3 攻击。
+	var jixiang_game = _boot(913)
+	jixiang_game.army.clear()
+	var jixiang := _add_unit(jixiang_game, "jixiang")
+	jixiang_game.resources["food"] = 30
+	jixiang_game._spend_food(6)
+	check(is_equal_approx(float(jixiang["max_hp"]), 11.0), "计相蚁 +3 HP per 6 food")
+	check(is_equal_approx(float(jixiang["attack"]), 4.5), "计相蚁 +3 attack per 6 food")
+	jixiang_game._spend_food(6)
+	check(is_equal_approx(float(jixiang["max_hp"]), 14.0), "计相蚁 stacks every 6 food")
+
+	# 因粮蚁：攻击命中 +1 食物。
+	var yinliang_game = _boot(914)
+	yinliang_game.army.clear()
+	var yinliang := _add_unit(yinliang_game, "yinliang")
+	_force_single_event(yinliang_game, {
+		"id": "tier_yinliang", "category": "enemy", "pressure": true,
+		"title": "因粮", "text": "", "battle": "sand", "effects": {},
+	})
+	yinliang_game.choose_encounter("fight")
+	yinliang_game.start_battle()
+	for row in ["front", "back"]:
+		for enemy in yinliang_game.battle["enemies"][row]:
+			enemy["shield"] = 0.0
+			enemy["hp"] = 50.0
+	var food_before := int(yinliang_game.resources["food"])
+	yinliang_game.select_player(int(yinliang["uid"]))
+	check(yinliang_game.player_attack("front", 0), "因粮蚁 attacks")
+	check(int(yinliang_game.resources["food"]) == food_before + 1, "因粮蚁 gains 1 food per hit")
+
+	# 堡坞蚁：嘲讽；受击后每轮 1 次 +1 护盾。
+	var baowu_game = _boot(915)
+	baowu_game.army.clear()
+	var baowu := _add_unit(baowu_game, "baowu")
+	_add_unit(baowu_game, "hushi")
+	_force_single_event(baowu_game, {
+		"id": "tier_baowu", "category": "enemy", "pressure": true,
+		"title": "堡坞", "text": "", "battle": "sand", "effects": {},
+	})
+	baowu_game.choose_encounter("fight")
+	baowu_game.start_battle()
+	var baowu_unit: Dictionary = baowu_game._player_by_uid(int(baowu["uid"]))
+	check(baowu_game._pick_player_target()["uid"] == int(baowu["uid"]), "堡坞蚁 taunts enemy single-target attacks")
+	var shield_before := float(baowu_unit["shield"])
+	baowu_game._after_take_damage(baowu_unit, 1.0)
+	check(is_equal_approx(float(baowu_unit["shield"]), shield_before + 1.0), "堡坞蚁 gains 1 shield after being hit")
+	baowu_game._after_take_damage(baowu_unit, 1.0)
+	check(is_equal_approx(float(baowu_unit["shield"]), shield_before + 1.0), "堡坞蚁 shield is once per round")
+
+	# 障塞蚁：替指定后排友军挡下下一次单体攻击。
+	var zhangsai_game = _boot(916)
+	zhangsai_game.army.clear()
+	var zhangsai := _add_unit(zhangsai_game, "zhangsai")
+	var hushi := _add_unit(zhangsai_game, "hushi")
+	_force_single_event(zhangsai_game, {
+		"id": "tier_zhangsai", "category": "enemy", "pressure": true,
+		"title": "障塞", "text": "", "battle": "sand", "effects": {},
+	})
+	zhangsai_game.choose_encounter("fight")
+	zhangsai_game.start_battle()
+	var zhangsai_unit: Dictionary = zhangsai_game._player_by_uid(int(zhangsai["uid"]))
+	var hushi_unit: Dictionary = zhangsai_game._player_by_uid(int(hushi["uid"]))
+	check(int(zhangsai_unit.get("guard_uid", 0)) == int(hushi["uid"]), "障塞蚁 guards the back-row ally")
+	var hushi_hp := float(hushi_unit["hp"])
+	zhangsai_game._attack(zhangsai_game.battle["enemies"]["front"][0], hushi_unit)
+	check(is_equal_approx(float(hushi_unit["hp"]), hushi_hp), "障塞蚁 takes the hit instead of the back row")
+
+	# 死士蚁 + 钦天蚁：不甘结算两次（全队 +2.0 攻击）。
+	var death_game = _boot(917)
+	death_game.army.clear()
+	var sishi := _add_unit(death_game, "sishi")
+	_add_unit(death_game, "qintian")
+	var houwang2 := _add_unit(death_game, "houwang")
+	_force_single_event(death_game, {
+		"id": "tier_death", "category": "enemy", "pressure": true,
+		"title": "不甘", "text": "", "battle": "sand", "effects": {},
+	})
+	death_game.choose_encounter("fight")
+	death_game.start_battle()
+	var houwang_unit2: Dictionary = death_game._player_by_uid(int(houwang2["uid"]))
+	var atk_before := float(houwang_unit2["atk"])
+	death_game._on_death(death_game._player_by_uid(int(sishi["uid"])), {})
+	check(is_equal_approx(float(houwang_unit2["atk"]), atk_before + 2.0), "钦天蚁 doubles 不甘: team +2.0 attack")
+
+	# 太仓蚁：交 5 食物，全队 +2 攻击 / 2 护盾。
+	var taicang_game = _boot(918)
+	taicang_game.army.clear()
+	_add_unit(taicang_game, "taicang")
+	var houwang3 := _add_unit(taicang_game, "houwang")
+	taicang_game.resources["food"] = 20
+	_force_single_event(taicang_game, {
+		"id": "tier_taicang", "category": "enemy", "pressure": true,
+		"title": "太仓", "text": "", "battle": "sand", "effects": {},
+	})
+	taicang_game.choose_encounter("fight")
+	taicang_game.start_battle()
+	var hw3: Dictionary = taicang_game._player_by_uid(int(houwang3["uid"]))
+	check(int(taicang_game.resources["food"]) == 15, "太仓蚁 pays 5 food at battle start")
+	check(is_equal_approx(float(hw3["atk"]), 4.0), "太仓蚁 gives +2.0 attack")
+	check(float(hw3["shield"]) >= 2.0, "太仓蚁 gives 2.0 shield")
+
+	# 丰稔蚁：击杀永久 +0.5 攻击；首杀额外 +1.0【战时】。
+	var fengren_game = _boot(919)
+	fengren_game.army.clear()
+	var fengren := _add_unit(fengren_game, "fengren")
+	_force_single_event(fengren_game, {
+		"id": "tier_fengren", "category": "enemy", "pressure": true,
+		"title": "丰稔", "text": "", "battle": "sand", "effects": {},
+	})
+	fengren_game.choose_encounter("fight")
+	fengren_game.start_battle()
+	for row in ["front", "back"]:
+		for enemy in fengren_game.battle["enemies"][row]:
+			enemy["shield"] = 0.0
+			enemy["hp"] = 0.1
+	fengren_game.select_player(int(fengren["uid"]))
+	fengren_game.player_attack("front", 0)
+	check(is_equal_approx(float(fengren["attack"]), 3.5), "丰稔蚁 kill grants +0.5 permanent attack")
 
 
 func _test_data_store() -> void:
@@ -600,13 +881,13 @@ func _test_data_store() -> void:
 func _test_full_run() -> void:
 	var game = _boot(31337)
 	var steps := 0
-	while steps < 4000:
+	while steps < 6000:
 		steps += 1
 		match game.phase:
 			GameStateScript.Phase.ACTION:
 				if int(game.resources["food"]) >= 4 and game.health < 50.0:
 					game.choose_action("heal")
-				elif game.nest_level < 3 and int(game.resources["food"]) >= (20 if game.nest_level == 1 else 30):
+				elif game.nest_level < 3 and int(game.resources["food"]) >= (12 if game.nest_level == 1 else 18):
 					game.choose_action("expand")
 				elif not game.seeds.is_empty() and not game.free_fertile_cells().is_empty():
 					game.plant_seed(game.seeds[0])
@@ -624,11 +905,22 @@ func _test_full_run() -> void:
 			GameStateScript.Phase.BATTLE:
 				_auto_battle(game)
 			GameStateScript.Phase.RECRUIT:
-				game.skip_recruit()
+				if game.army.size() < 3 and not game.recruit_candidates.is_empty():
+					var picked := ""
+					for unit_id in game.recruit_candidates:
+						if game.can_recruit(unit_id):
+							picked = unit_id
+							break
+					if picked != "":
+						game.recruit(picked)
+					else:
+						game.end_recruit()
+				else:
+					game.end_recruit()
 			_:
 				break
 
-	check(steps < 4000, "full run terminates (no infinite loop)")
+	check(steps < 6000, "full run terminates (no infinite loop)")
 	check(
 		game.phase == GameStateScript.Phase.WON or game.phase == GameStateScript.Phase.GAME_OVER,
 		"full run ends in WON or GAME_OVER"
@@ -683,7 +975,7 @@ func _play_until_turn_end(game) -> void:
 		elif game.phase == GameStateScript.Phase.BATTLE:
 			_auto_battle(game)
 		elif game.phase == GameStateScript.Phase.RECRUIT:
-			game.skip_recruit()
+			game.end_recruit()
 		else:
 			break
 
@@ -692,17 +984,16 @@ func _auto_battle(game) -> void:
 	var guard := 0
 	while game.phase == GameStateScript.Phase.BATTLE and guard < 300:
 		guard += 1
+		var attacker := {}
 		if game.player_has_ap():
-			var row := "front" if game.enemies_front_alive() else "back"
-			var list: Array = game.battle["enemies"][row]
-			var target := -1
-			for index in list.size():
-				if bool(list[index]["alive"]):
-					target = index
-					break
-			if target >= 0:
-				game.player_attack(row, target)
-			else:
-				break
-		else:
+			attacker = _first_ready_player(game)
+		if attacker.is_empty():
+			# 只剩 0 攻击单位可动时，直接结束玩家阶段，避免空转。
+			game.end_player_phase()
+			continue
+		var target := _first_alive_enemy(game)
+		if target.is_empty():
+			break
+		game.select_player(int(attacker["uid"]))
+		if not game.player_attack(str(target[0]), int(target[1])):
 			game.end_player_phase()

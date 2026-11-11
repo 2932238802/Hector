@@ -1,7 +1,7 @@
 ---
 status: living
 owner: design
-last-review: 2026-11-09
+last-review: 2026-11-11
 ---
 
 # 数据契约 v1（`data/*.json`）
@@ -23,7 +23,7 @@ last-review: 2026-11-09
 
 | 文件 | 内容 | 本期规模 |
 |---|---|---|
-| `data/units.json` | 兵种 | 12 个一阶 |
+| `data/units.json` | 兵种 | 31 个（一阶 14 / 二阶 11 / 三阶 6） |
 | `data/enemies.json` | 敌人 | 4 个（盾甲 / 锹甲 / 结网蛛 / 掠食雀） |
 | `data/events.json` | 事件池 + 事件组模板 + 季节权重 | 13 个事件 / 6 模板 |
 | `data/balance.json` | 全局常数 | 见 §5 |
@@ -44,9 +44,9 @@ last-review: 2026-11-09
 | 字段 | 类型 | 取值 / 说明 |
 |---|---|---|
 | `id` | string | 唯一，如 `ruishi` |
-| `name` | string | 显示名，如 `锐士` |
+| `name` | string | 显示名，如 `弧矢蚁` |
 | `name_alt` | string | 备选名，仅留档，不显示 |
-| `tier` | int | `1` / `2` / `3`（本期只有 1） |
+| `tier` | int | `1` / `2` / `3`（对应巢穴 L1 / L2 / L3） |
 | `source` | enum | `shared` / `species` |
 | `species_id` | string \| null | `source=species` 时必填，如 `linshi` |
 | `role` | string | 自由文本，如 `前排主力` |
@@ -56,7 +56,7 @@ last-review: 2026-11-09
 | `ap` | int | ≥ 1，默认 1 |
 | `row` | enum | `front` / `back` / `either` |
 | `signature` | object | `{id, name, text, params}`；`params` 放可调数值 |
-| `keywords` | string[] | 只能取 `迅捷` / `角质化` / `点卯` / `营巢` / `不甘` / `余勇` / `猎杀` / `反噬` / `寄生` / `狂热` / `引导` / `扼守` / `不灭` / `偷袭` / `护卫` / `迟滞` |
+| `keywords` | string[] | 只能取 `迅捷` / `角质化` / `点卯` / `营巢` / `不甘` / `号令` / `余勇` / `猎杀` / `反噬` / `狂热` / `引导` / `扼守` |
 | `weakness` | string | 主要缺点，一句话 |
 | `status` | enum | `final` / `proposal`（数据侧标记，UI 可显示） |
 
@@ -87,6 +87,26 @@ last-review: 2026-11-09
 | `count_min` / `count_max` | int | 该敌人一次出现的数量区间 |
 | `is_elite` | bool | 强敌标记 |
 | `tags` | string[] | 自由标签（如 `甲虫` / `越排`） |
+
+**顶层结构**（2026-11-11 与代码对齐）：
+
+```json
+{
+  "schema_version": 1,
+  "enemies": [ { "id": "dunjia", "...": "..." } ],
+  "encounters": {
+    "sand": {
+      "name": "沙路截击",
+      "units": [ { "enemy_id": "dunjia", "count": 2 } ]
+    }
+  }
+}
+```
+
+| 遭遇字段 | 说明 |
+|---|---|
+| `encounters.<id>.name` | 战斗显示名 |
+| `encounters.<id>.units` | `[{enemy_id, count}]`；按站位放入前 4 / 后 3，放不下则跳过并记日志 |
 
 ## 4. `events.json`
 
@@ -126,17 +146,23 @@ last-review: 2026-11-09
 
 | 键 | 字段 | 本期值 |
 |---|---|---|
-| `upkeep` | `base` / `pop_divisor` | `1` / `5` |
-| `harvest.food` | `period_events` / `amount` | `3` / `2` |
-| `harvest.bountiful` | `period_events` / `amount` | `5` / `4` |
-| `spring` | `production_bonus` / `enemy_scale` / `explore_worker_loss` | `1` / `1.1` / `1` |
-| `weather.clear` | `production_bonus` | `1` |
-| `weather.cloudy` | — | 无修正 |
-| `weather.rain` | `explore_worker_loss` | `1` |
-| `combat` | `target_rounds` / `verdict_round` | `[3,4]` / `6` |
-| `rewards.normal` | `food_min` / `food_max` / `result_chance` | `2` / `4` / `0.5` |
-| `rewards.elite` | `food_min` / `food_max` / `relic_chance` | `4` / `6` / `0.5` |
-| `start` | `nest_level` / `food` / `plots` / `free_recruits` | `2` / `15` / `3` / `2` |
+| `max_health` | — | `100` |
+| `start` | `health` / `food` / `nest_level` / `seed` / `free_recruits` | `100` / `15` / `1` / `grain_basic` / `2` |
+| `actions.adventure` | `food_cost_min` / `food_cost_max` / `food_min` / `food_max` / `seed_chance` / `health` / `seed_pool` | `1` / `2` / `2` / `4` / `0.35` / `-2` / 4 个种子 id |
+| `actions.heal` | `food_cost` / `health` | `4` / `18` |
+| `actions.expand` | `exp_threshold` | `[0, 12, 18]` |
+| `nest` | `max_level` / `fertile_per_ring` | `3` / `3` |
+| `army` | `max_size` / `front` / `back` | `7` / `4` / `3` |
+| `recruit` | `refresh_cost` / `candidates` / `tier_rates` | `1` / `3` / 见下 |
+| `combat` | `defeat_health` / `verdict_round` / `rewards` | `5` / `6` / 按遭遇 id 分档 |
+| `spring` | `production_bonus` / `enemy_scale` / `explore_food_loss` | `1` / `1.1` / `1` |
+| `weather` | `names` / `weights` / `effects` | 晴 / 雨 / 多云；季内 4 段权重；晴产出 +1、雨探索损失 +1 且冒险生命 −1 |
+| `season_modifier` | 4 项 `adventure_food` | 春夏秋冬冒险食物修正 |
+| `event_groups_per_turn` | — | `3`（每回合可选事件组数） |
+| `location` / `locations` | `name` / `blocked_dirs` | `river`；河边 / 人类房屋边 / 沙漠 |
+
+**`recruit.tier_rates`**：按巢穴等级给出各阶级出现率，形如 `"2": [[1,60],[2,40]]`，权重合计 100。
+**`combat.rewards`**：按遭遇 id 给 `{food:[min,max], warfruits:概率, amber:概率}`；目前 `bird` 为强敌档。
 
 ## 6. `species.json`
 
@@ -160,7 +186,7 @@ last-review: 2026-11-09
 ## 8. 校验规则（工具与运行时共用）
 
 1. 所有 `id` 在文件内唯一；跨文件引用必须存在（事件的 `battle.enemy_id`、`gain_relic` 等）。
-2. `tier` 只能是 1–3；本期数据只允许 1。
+2. `tier` 只能是 1–3。
 3. `hp > 0`、`attack ≥ 0`、`cost_food ≥ 0`、`ap ≥ 1`。
 4. `row` / `keywords` / `category` / `status` 只能取枚举值。
 5. 模板 `slots` 必须 4 项，且至少 1 项敌对。

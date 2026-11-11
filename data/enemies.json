@@ -1,29 +1,109 @@
 {
   "schema_version": 1,
-  "tiers": {
+  "enemies": [
+    {
+      "id": "dunjia",
+      "name": "盾甲",
+      "family": "beetle",
+      "tier": 1,
+      "hp": 8.0,
+      "attack": 1.5,
+      "ap": 1,
+      "row": "front",
+      "signature": {
+        "id": "houjia",
+        "name": "厚甲",
+        "text": "每轮玩家阶段开始获得 2.0 护盾，不叠加",
+        "params": { "shield_per_round": 2.0 }
+      },
+      "keywords": [],
+      "count_min": 1,
+      "count_max": 2,
+      "is_elite": false,
+      "tags": ["甲虫", "护盾"]
+    },
+    {
+      "id": "qiaojia",
+      "name": "锹甲",
+      "family": "beetle",
+      "tier": 1,
+      "hp": 6.0,
+      "attack": 2.5,
+      "ap": 1,
+      "row": "front",
+      "signature": {
+        "id": "tiaoji",
+        "name": "挑击",
+        "text": "攻击命中后 30% 使目标获得【削弱】",
+        "params": { "weaken_chance": 0.30 }
+      },
+      "keywords": [],
+      "count_min": 1,
+      "count_max": 2,
+      "is_elite": false,
+      "tags": ["甲虫", "削弱"]
+    },
+    {
+      "id": "jiewangzhu",
+      "name": "结网蛛",
+      "family": "spider",
+      "tier": 1,
+      "hp": 4.0,
+      "attack": 2.0,
+      "ap": 1,
+      "row": "back",
+      "signature": {
+        "id": "tusi",
+        "name": "吐丝",
+        "text": "每轮玩家阶段开始，对随机 1 名玩家单位施加【削弱】",
+        "params": { "weaken_per_round": 1 }
+      },
+      "keywords": [],
+      "count_min": 1,
+      "count_max": 2,
+      "is_elite": false,
+      "tags": ["蜘蛛", "削弱"]
+    },
+    {
+      "id": "lueshique",
+      "name": "掠食雀",
+      "family": "bird",
+      "tier": 1,
+      "hp": 9.0,
+      "attack": 3.0,
+      "ap": 1,
+      "row": "back",
+      "signature": {
+        "id": "fuchong",
+        "name": "俯冲",
+        "text": "每轮首次攻击无视前排，直接攻击玩家后排 1 名单位",
+        "params": { "bypass_first": true }
+      },
+      "keywords": [],
+      "count_min": 1,
+      "count_max": 1,
+      "is_elite": true,
+      "tags": ["鸟", "强敌", "越排"]
+    }
+  ],
+  "encounters": {
     "sand": {
       "name": "沙路截击",
-      "units": [
-        { "id": "dunjia", "name": "盾甲", "family": "beetle", "tier": 1, "hp": 8.0, "atk": 1.5, "ap": 1, "row": "front", "count": 2, "shield_per_round": 2.0, "is_elite": false }
-      ]
+      "units": [{ "enemy_id": "dunjia", "count": 2 }]
     },
     "resin": {
       "name": "树脂争夺",
-      "units": [
-        { "id": "qiaojia", "name": "锹甲", "family": "beetle", "tier": 1, "hp": 6.0, "atk": 2.5, "ap": 1, "row": "front", "count": 2, "weaken_chance": 0.3, "is_elite": false }
-      ]
+      "units": [{ "enemy_id": "qiaojia", "count": 2 }]
     },
     "nest": {
       "name": "巢口巡游",
-      "units": [
-        { "id": "jiewangzhu", "name": "结网蛛", "family": "spider", "tier": 1, "hp": 4.0, "atk": 2.0, "ap": 1, "row": "back", "count": 2, "weaken_per_round": 1, "is_elite": false }
-      ]
+      "units": [{ "enemy_id": "jiewangzhu", "count": 2 }]
     },
     "bird": {
       "name": "雀袭（强敌）",
       "units": [
-        { "id": "lueshique", "name": "掠食雀", "family": "bird", "tier": 1, "hp": 9.0, "atk": 3.0, "ap": 1, "row": "back", "count": 1, "bypass_first": true, "is_elite": true },
-        { "id": "dunjia", "name": "盾甲", "family": "beetle", "tier": 1, "hp": 8.0, "atk": 1.5, "ap": 1, "row": "front", "count": 1, "shield_per_round": 2.0, "is_elite": false }
+        { "enemy_id": "lueshique", "count": 1 },
+        { "enemy_id": "dunjia", "count": 1 }
       ]
     }
   }

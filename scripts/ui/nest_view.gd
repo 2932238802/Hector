@@ -5,12 +5,15 @@ extends Control
 
 const HexGridScript := preload("res://scripts/core/hex_grid.gd")
 
-const INK := Color("1a1a1a")
+const INK := Color("201d18")
 const MUTED := Color("6f6a60")
+const ACCENT := Color("3d5a3a")
+const GOLD := Color("93641f")
 const PAPER_CELL := Color(1, 1, 1, 0.88)
 const FERTILE_FILL := Color(0.87, 0.84, 0.74, 0.95)
 const BLOCKED_FILL := Color(0.1, 0.1, 0.1, 0.07)
 const BLOCKED_LINE := Color(0.45, 0.42, 0.37)
+const HOVER_FILL := Color(0.24, 0.35, 0.23, 0.12)
 
 var _cells: Array = []
 var _level := 1
@@ -37,14 +40,24 @@ func _draw() -> void:
 	if font == null:
 		return
 
+	var usable := 0
+	var fertile_total := 0
+	for cell in _cells:
+		if bool(cell.get("blocked", false)):
+			continue
+		usable += 1
+		if bool(cell.get("fertile", false)):
+			fertile_total += 1
+
 	draw_string(
-		font, Vector2(6, 22), "巢穴 Lv.%d" % _level,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 20, INK
+		font, Vector2(6, 24), "巢穴 Lv.%d" % _level,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 21, ACCENT
 	)
 	draw_string(
-		font, Vector2(6, 42), "六边形外圈 = 可扩展位；小圆点 = 肥沃格（可播种）",
+		font, Vector2(6, 45), "可用 %d 格 · 肥沃 %d 格 · 小圆点 = 可播种" % [usable, fertile_total],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, MUTED
 	)
+	draw_line(Vector2(6, 54), Vector2(size.x - 6, 54), Color(0.16, 0.14, 0.11, 0.10), 1.0)
 
 	var hex := _hex_size()
 	var center := Vector2(size.x * 0.5, size.y * 0.5 + 12.0)
@@ -68,10 +81,11 @@ func _draw() -> void:
 			draw_colored_polygon(points, FERTILE_FILL if fertile else PAPER_CELL)
 			draw_polyline(outline, INK, 1.3, true)
 			if fertile:
-				draw_circle(cell_center, hex * 0.16, INK)
+				draw_circle(cell_center, hex * 0.16, GOLD)
 
 		if Vector2i(q, r) == _hover:
-			draw_polyline(outline, INK, 3.0, true)
+			draw_colored_polygon(points, HOVER_FILL)
+			draw_polyline(outline, ACCENT, 3.0, true)
 
 	if _hover.x != 999:
 		var status := "被阻断" if _hover_blocked else _hover_status()
@@ -91,7 +105,8 @@ func _hover_status() -> String:
 
 
 func _hex_size() -> float:
-	var max_ring := maxi(_level - 1, 0)
+	# 巢穴等级 L 会画出 0..L 圈，因此最外圈半径按 L 计算。
+	var max_ring := maxi(_level, 0)
 	var width_units := HexGridScript.SQRT3 * (2.0 * max_ring + 1.0)
 	var height_units := 3.0 * max_ring + 2.0
 	var available := Vector2(size.x - 16.0, size.y - 60.0)

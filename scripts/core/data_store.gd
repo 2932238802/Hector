@@ -23,7 +23,7 @@ const REQUIRED_KEYS := {
 	"events": ["events"],
 	"event_templates": ["templates"],
 	"units": ["units"],
-	"enemies": ["tiers"],
+	"enemies": ["enemies"],
 	"seeds": ["seeds"],
 }
 

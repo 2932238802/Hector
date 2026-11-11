@@ -37,6 +37,9 @@ desktop.ini
 *.tmp
 *.bak
 _shots/
+.screens/
+.archify/
+.claude/
 
 # ---------------------------------------------------------------
 # Secrets

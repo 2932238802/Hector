@@ -23,7 +23,7 @@
       "health": 18
     },
     "expand": {
-      "exp_threshold": [0, 20, 30]
+      "exp_threshold": [0, 12, 18]
     }
   },
   "nest": {
@@ -36,7 +36,7 @@
     "back": 3
   },
   "recruit": {
-    "refresh_cost": 3,
+    "refresh_cost": 1,
     "candidates": 3,
     "tier_rates": {
       "1": [[1, 100]],
@@ -45,7 +45,7 @@
     }
   },
   "combat": {
-    "defeat_health": 10,
+    "defeat_health": 5,
     "verdict_round": 6,
     "rewards": {
       "sand": { "food": [2, 4], "warfruits": 0.5, "amber": 0.0 },
