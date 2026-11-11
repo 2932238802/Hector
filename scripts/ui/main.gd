@@ -6,6 +6,7 @@ const GameStateScript := preload("res://scripts/core/game_state.gd")
 const DataStoreScript := preload("res://scripts/core/data_store.gd")
 const EventPoolScript := preload("res://scripts/core/event_pool.gd")
 const NestViewScript := preload("res://scripts/ui/nest_view.gd")
+const BattleBoardScript := preload("res://scripts/ui/battle_board.gd")
 
 const INK := Color("201d18")
 const MUTED := Color("6f6a60")
@@ -20,6 +21,7 @@ const DANGER_SOFT := Color("f1ded8")
 
 var game = null
 var nest_view = null
+var battle_board = null
 var side_box: VBoxContainer
 var footer_box: VBoxContainer
 var log_label: RichTextLabel
@@ -115,8 +117,12 @@ func _maybe_demo() -> void:
 		game.ready_up()
 	elif not show_event:
 		game.choose_encounter("fight")
+	if "--demo-bench" in args and not game.deploy_units.is_empty():
+		game.deploy_units[game.deploy_units.size() - 1]["deployed"] = false
 	if "--demo-battle" in args:
 		game.start_battle()
+		if "--demo-hand" in args:
+			game.warfruits = {"xunjie": 1, "bugan": 2, "warspoil": 1, "resin": 1, "venom": 2}
 		if "--demo-select" in args:
 			var picked := false
 			for row in ["front", "back"]:
@@ -345,6 +351,13 @@ func _build_nest_panel() -> Control:
 	nest_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nest_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_child(nest_view)
+
+	# 布阵 / 战斗时用六边形战场板盖住巢穴视图。
+	battle_board = BattleBoardScript.new()
+	battle_board.visible = false
+	battle_board.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	battle_board.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.add_child(battle_board)
 	return panel
 
 
@@ -438,6 +451,16 @@ func _refresh() -> void:
 
 	_build_side()
 	nest_view.set_data(game.cells, game.nest_level)
+	var on_board: bool = (
+		game.phase == GameStateScript.Phase.DEPLOY
+		or game.phase == GameStateScript.Phase.BATTLE
+	)
+	nest_view.visible = not on_board
+	battle_board.visible = on_board
+	if on_board:
+		if battle_board.game != game:
+			battle_board.bind(game)
+		battle_board.refresh()
 
 	log_label.bbcode_enabled = true
 	var recent: Array = game.logs.slice(maxi(0, game.logs.size() - 8))
@@ -935,6 +958,14 @@ func _build_battle() -> void:
 			_danger_style(button)
 			button.pressed.connect(_on_attack.bind(row, index))
 			side_box.add_child(_unit_card(button, float(enemy["hp"]), float(enemy["max_hp"]), true))
+
+	var bench_names := PackedStringArray()
+	for entry in game.deploy_units:
+		if not bool(entry.get("deployed", false)):
+			bench_names.append(str(entry.get("name", "")))
+	if not bench_names.is_empty():
+		side_box.add_child(_section("未上场（%d）" % bench_names.size()))
+		side_box.add_child(_hint("、".join(bench_names)))
 
 	var end_button := Button.new()
 	end_button.text = "结束玩家阶段 → 敌方行动"
